@@ -1,9 +1,8 @@
 package advent2019.day1
 
 fun main() {
-    print(day1_1())
-    print("\n")
-    print(day1_2())
+    println(day1_1())
+    println(day1_2())
 }
 
 fun day1_1(): Double {
@@ -18,11 +17,11 @@ fun day1_2(): Double {
     return result
 }
 
-fun massesToFuelNaive(masses: List<Int>) = masses.map {massToFuelNaive(it.toDouble())}.sum()
+fun massesToFuelNaive(masses: List<Int>) = masses.map { massToFuelNaive(it.toDouble()) }.sum()
 
 fun massToFuelNaive(mass: Double) = kotlin.math.floor(mass / 3) - 2
 
-fun massesToFuel(masses: List<Int>) = masses.map {massToFuel(it.toDouble())}.sum()
+fun massesToFuel(masses: List<Int>) = masses.map { massToFuel(it.toDouble()) }.sum()
 
 fun massToFuel(mass: Double): Double = calculateFuelForFuelMass(massToFuelNaive(mass))
 
@@ -133,4 +132,5 @@ fun get_inputs() = listOf(
     147609,
     143714,
     55276,
-    66162)
+    66162
+)
