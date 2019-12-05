@@ -2,6 +2,7 @@ package advent2019.day2
 
 fun main() {
     runExamplesPart1()
+    println("Final day2-1 result:")
     println(applyOpcodes(get_input()))
 }
 
@@ -14,23 +15,39 @@ fun runExamplesPart1() {
     println("END Examples")
 }
 
-fun applyOpcodes(inputMem: List<Int>): List<Int> {
-    return applyOpcodesR(inputMem)
+fun applyOpcodes(inputMem: List<Int>) =
+    generateSequence(State(inputMem)) {
+        it.runNext().takeIf { x -> x.status != "halted" }
+    }.toList().last()
+
+data class State(
+    val memory: List<Int>,
+    val currentPos: Int = 0,
+    val status: String = "running"
+) {
+    fun isDone() = currentPos >= memory.count() || memory[currentPos] == 99
+
+    fun currentValue() = memory[currentPos]
+
+    fun valueAt(position: Int) = memory[position]
+
+    fun runNext(): State =
+        if (isDone()) {
+            State(memory, currentPos, "halted")
+        } else {
+            applyOpcode(this)
+        }
+
+    fun copyWithNewValueAt(position: Int, newValue: Int) = State(
+        memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
+        currentPos = currentPos + opcodeLength(currentValue())
+    )
 }
 
-tailrec fun applyOpcodesR(inputMem: List<Int>, currentPos: Int = 0): List<Int> =
-    if (currentPos >= inputMem.count()) {
-        inputMem
-    } else {
-        val opcode = getPosValue(inputMem, currentPos)
-        val nextPos = currentPos + opcodeLength(opcode)
-        applyOpcodesR(applyOpcode(inputMem, opcode, currentPos), nextPos)
-    }
-
-fun applyOpcode(inputMem: List<Int>, opcode: Int, currentPos: Int) = when (opcode) {
-    1    -> applyAdd(inputMem, currentPos)
-    2    -> applyMultiply(inputMem, currentPos)
-    else -> inputMem
+fun applyOpcode(state: State) = when (state.currentValue()) {
+    1    -> applyAdd(state)
+    2    -> applyMultiply(state)
+    else -> state
 }
 
 fun opcodeLength(opcode: Int): Int = when (opcode) {
@@ -39,29 +56,23 @@ fun opcodeLength(opcode: Int): Int = when (opcode) {
     else -> 1
 }
 
-fun applyAdd(inputMem: List<Int>, currentPos: Int): List<Int> {
-    val xaddr = getPosValue(inputMem, currentPos + 1)
-    val yaddr = getPosValue(inputMem, currentPos + 2)
-    val outaddr = getPosValue(inputMem, currentPos + 3)
-    val x = getPosValue(inputMem, xaddr)
-    val y = getPosValue(inputMem, yaddr)
-    val result = setPosValue(inputMem, outaddr, x + y)
-    return result
+fun applyAdd(state: State): State {
+    val xaddr = state.valueAt(state.currentPos + 1)
+    val yaddr = state.valueAt(state.currentPos + 2)
+    val outaddr = state.valueAt(state.currentPos + 3)
+    val x = state.valueAt(xaddr)
+    val y = state.valueAt(yaddr)
+    return state.copyWithNewValueAt(position = outaddr, newValue = x + y)
 }
 
-fun applyMultiply(inputMem: List<Int>, currentPos: Int): List<Int> {
-    val xaddr = getPosValue(inputMem, currentPos + 1)
-    val yaddr = getPosValue(inputMem, currentPos + 2)
-    val outaddr = getPosValue(inputMem, currentPos + 3)
-    val x = getPosValue(inputMem, xaddr)
-    val y = getPosValue(inputMem, yaddr)
-    return setPosValue(inputMem, outaddr, x * y)
+fun applyMultiply(state: State): State {
+    val xaddr = state.valueAt(state.currentPos + 1)
+    val yaddr = state.valueAt(state.currentPos + 2)
+    val outaddr = state.valueAt(state.currentPos + 3)
+    val x = state.valueAt(xaddr)
+    val y = state.valueAt(yaddr)
+    return state.copyWithNewValueAt(position = outaddr, newValue = x * y)
 }
-
-fun getPosValue(inputMem: List<Int>, position: Int) = inputMem[position]
-
-fun setPosValue(inputMem: List<Int>, position: Int, newValue: Int) =
-    inputMem.mapIndexed { index, x -> if (index == position) newValue else x }
 
 fun get_input() = listOf(
     1,
