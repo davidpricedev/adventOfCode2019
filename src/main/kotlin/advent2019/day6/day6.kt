@@ -1,6 +1,5 @@
 package advent2019.day6
 
-import advent2019.day2.applyOpcodes
 
 fun main() {
     runPart1()
