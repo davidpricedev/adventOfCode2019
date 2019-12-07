@@ -5,11 +5,19 @@ import advent2019.day2.applyOpcodes
 fun main() {
     runExamplesPart1()
     runPart1()
+    runExamplesPart2()
+    runPart2()
 }
 
 fun runExamplesPart1() {
-    println("Examples:")
-    println(countAllAncestors(inputToMap(getExampleInput())))
+    println("Examples Part1:")
+    println(countAllAncestors(inputToMap(getExampleInputPart1())))
+    println("END Examples")
+}
+
+fun runExamplesPart2() {
+    println("Examples Part2:")
+    println(calculateShortestPath(getExampleInputPart2(), "YOU", "SAN"))
     println("END Examples")
 }
 
@@ -17,16 +25,37 @@ fun runPart1() {
     println(countAllAncestors(inputToMap(getInput())))
 }
 
+fun runPart2() {
+    println(calculateShortestPath(getInput(), "YOU", "SAN"))
+}
+
 fun countAllAncestors(map: Map<String, String>) =
-    map.keys.map { countAncestors(it, map, 0) }.sum()
+    map.keys.map { buildAncestorList(it, map, listOf()).count() }.sum()
 
-val countAncestors = ::countAncestorsRaw.memoize()
+/**
+ * Part 2
+ * Calculate the shortest orbit jump path between one orbiting body (start) and another (dest)
+ */
+fun calculateShortestPath(input: List<String>, start: String, dest: String): Int {
+    // Build the raw data we need
+    val map = inputToMap(input)
+    val ancestorMap = map.mapValues { buildAncestorList(it.key, map, listOf()) }
+    // Now find the nearest common ancestor
+    val startAncestors = ancestorMap[start] ?: listOf()
+    val destAncestors = ancestorMap[dest] ?: listOf()
+    val intersects = startAncestors.intersect(destAncestors)
+    val nearestCommonAncestor = intersects.first()
+    return startAncestors.indexOf(nearestCommonAncestor) + destAncestors.indexOf(nearestCommonAncestor)
+}
 
-tailrec fun countAncestorsRaw(key: String, map: Map<String, String>, count: Int = 0): Int =
+val buildAncestorList = ::buildAncestorListRaw.memoize()
+
+fun buildAncestorListRaw(key: String, map: Map<String, String>, ancestorList: List<String> = listOf()): List<String> =
     if (!map.containsKey(key)) {
-        count
+        ancestorList
     } else {
-        countAncestorsRaw(map[key] ?: "(╯°□°)╯︵ ┻━┻", map, 1 + count)
+        val nextKey = map[key] ?: "(╯°□°)╯︵ ┻━┻"
+        buildAncestorList(nextKey, map, ancestorList.plus(nextKey))
     }
 
 fun inputToMap(input: List<String>) = input.map { stringToPair(it) }.toMap()
@@ -47,7 +76,7 @@ fun <A, B, C, R> ((A, B, C) -> R).memoize(
     cache.getOrPut(Triple(a, b, c)) { this(a, b, c) }
 }
 
-fun getExampleInput() = """
+fun getExampleInputPart1() = """
 COM)B
 B)C
 C)D
@@ -59,6 +88,22 @@ D)I
 E)J
 J)K
 K)L
+""".trim().split("\n")
+
+fun getExampleInputPart2() = """
+COM)B
+B)C
+C)D
+D)E
+E)F
+B)G
+G)H
+D)I
+E)J
+J)K
+K)L
+K)YOU
+I)SAN
 """.trim().split("\n")
 
 fun getInput() = """
