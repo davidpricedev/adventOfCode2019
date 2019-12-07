@@ -1,14 +1,27 @@
 package advent2019.day2
 
 fun main() {
-    runPart1()
+    // part 1
+    println(blackBox(12, 2))
+    // part 2
+    println(findInputsForGivenOutput())
 }
 
-fun runPart1() {
-    val resultState = applyOpcodes(get_real_input())
-    val answer = resultState.memory[0]
-    println(answer)
+fun findInputsForGivenOutput(): Int {
+    val output = 19690720
+    for (x in 0..99) {
+        for (y in 0..99) {
+            val result = blackBox(x, y)
+            if (result == output) {
+                println("$x, $y -> $result")
+                return 100 * x + y
+            }
+        }
+    }
+    return -1
 }
+
+fun blackBox(noun: Int, verb: Int) = applyOpcodes(get_real_input(noun, verb)).memory[0]
 
 fun applyOpcodes(inputMem: List<Int>) =
     generateSequence(State(inputMem)) {
@@ -74,9 +87,9 @@ fun applyMultiply(state: State): State {
 /**
  * Deal with the replacement insanity
  */
-fun get_real_input() =
+fun get_real_input(noun: Int, verb: Int) =
     inputStringToList(get_bogus_input()).mapIndexed { i, x ->
-        if (i == 1) 12 else if (i == 2) 2 else x.toInt()
+        if (i == 1) noun else if (i == 2) verb else x
     }
 
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toInt() }
