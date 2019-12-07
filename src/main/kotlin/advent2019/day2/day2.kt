@@ -5,7 +5,7 @@ import advent2019.IntCode.inputStringToList
 
 fun main() {
     // part 1
-    println(blackBox(12, 2))
+    println(run(12, 2))
     // part 2
     println(findInputsForGivenOutput())
 }
@@ -14,7 +14,7 @@ fun findInputsForGivenOutput(): Int {
     val output = 19690720
     for (x in 0..99) {
         for (y in 0..99) {
-            val result = blackBox(x, y)
+            val result = run(x, y)
             if (result == output) {
                 println("$x, $y -> $result")
                 return 100 * x + y
@@ -24,7 +24,7 @@ fun findInputsForGivenOutput(): Int {
     return -1
 }
 
-fun blackBox(noun: Int, verb: Int) = applyOpcodes(get_real_input(noun, verb)).memory[0]
+fun run(noun: Int, verb: Int) = applyOpcodes(get_real_input(noun, verb)).memory[0]
 
 /**
  * Deal with the replacement insanity

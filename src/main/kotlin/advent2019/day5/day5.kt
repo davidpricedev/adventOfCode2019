@@ -5,14 +5,23 @@ import advent2019.IntCode.inputStringToList
 
 fun main() {
     runPart1()
+    runPart2()
 }
 
 fun runPart1() {
-    val program = part1Program()
-    val programList = inputStringToList(program)
-    val comp = State(programList, inputs = listOf(1))
+    val programList = inputStringToList(part1Program())
+    println(run(programList, 1))
+}
+
+fun runPart2() {
+    val programList = inputStringToList(part1Program())
+    println(run(programList, 5))
+}
+
+fun run(programList: List<Int>, input: Int): Int {
+    val comp = State(programList, inputs = listOf(input))
     val result = comp.run()
-    println(result.outputs.last())
+    return result.outputs.last()
 }
 
 fun part1Program() =

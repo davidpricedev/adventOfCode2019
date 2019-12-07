@@ -33,9 +33,10 @@ data class State(
 
     fun runNext(): State =
         if (isDone()) {
+            if (debug) println("halting")
             State(memory, currentPos, "halted")
         } else {
-            if (debug) println(memory)
+            if (debug) println(this)
             applyOpcode(this)
         }
 
@@ -51,7 +52,7 @@ data class State(
         return when (mode) {
             0    -> valueAt(valueAt(currentPos + paramOrd))
             1    -> valueAt(currentPos + paramOrd)
-            else -> throw Exception("(╯°□°)╯︵ ┻━┻")
+            else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode is unknown")
         }
     }
 
@@ -60,7 +61,7 @@ data class State(
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd)
             1    -> currentPos + paramOrd
-            else -> throw Exception("(╯°□°)╯︵ ┻━┻")
+            else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode is unknown")
         }
     }
 }
@@ -70,7 +71,11 @@ fun applyOpcode(state: State) = when (state.currentOpCode()) {
     2    -> applyMultiply(state)
     3    -> applyInput(state)
     4    -> applyOutput(state)
-    else -> state
+    5    -> applyJumpIfTrue(state)
+    6    -> applyJumpIfFalse(state)
+    7    -> applyLessThan(state)
+    8    -> applyEqual(state)
+    else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${state.currentOpCode()} is unknown")
 }
 
 fun opcodeLength(opcode: Int): Int = when (opcode) {
@@ -78,6 +83,10 @@ fun opcodeLength(opcode: Int): Int = when (opcode) {
     2    -> 4
     3    -> 2
     4    -> 2
+    5    -> 3
+    6    -> 3
+    7    -> 4
+    8    -> 4
     else -> 1
 }
 
@@ -128,4 +137,45 @@ fun applyOutput(state: State): State {
         outputs = state.outputs.plus(outval),
         currentPos = state.currentPos + opcodeLength(state.currentOpCode())
     )
+}
+
+fun applyJumpIfTrue(state: State): State {
+    val checkVal = state.getInParam(1)
+    if (state.debug) println("[${state.currentPos}] jump-if-true $checkVal")
+    return if (checkVal != 0) applyJump(state) else advancePastJump(state)
+}
+
+fun applyJumpIfFalse(state: State): State {
+    val checkVal = state.getInParam(1)
+    if (state.debug) println("[${state.currentPos}] jump-if-false $checkVal")
+    return if (checkVal == 0) applyJump(state) else advancePastJump(state)
+}
+
+fun advancePastJump(state: State): State {
+    if (state.debug) println("[${state.currentPos}] jump-check failed")
+    return state.copy(currentPos = state.currentPos + opcodeLength(state.currentOpCode()))
+}
+
+fun applyJump(state: State): State {
+    val jumpTarget = state.getInParam(2)
+    if (state.debug) println("[${state.currentPos}] jumping to &$jumpTarget")
+    return state.copy(currentPos = jumpTarget)
+}
+
+fun applyLessThan(state: State): State {
+    val x = state.getInParam(1)
+    val y = state.getInParam(2)
+    val outaddr = state.getOutPos(3)
+    val result = if (x < y) 1 else 0
+    if (state.debug) println("[${state.currentPos}] lessthan-check result $result, storing result to &$outaddr")
+    return state.copyWithNewValueAt(position = outaddr, newValue = result)
+}
+
+fun applyEqual(state: State): State {
+    val x = state.getInParam(1)
+    val y = state.getInParam(2)
+    val outaddr = state.getOutPos(3)
+    val result = if (x == y) 1 else 0
+    if (state.debug) println("[${state.currentPos}] equality-check result $result, storing result to &$outaddr")
+    return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
