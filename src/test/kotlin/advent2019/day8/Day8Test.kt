@@ -14,7 +14,7 @@ class Day8Test : FreeSpec(
                 layers.count() shouldBe 2
                 layers[0].count() shouldBe 6
                 val result = checkSumOfMinZeroLayer(input, 3, 2)
-                result shouldBe 0
+                result shouldBe 1
             }
         }
     })

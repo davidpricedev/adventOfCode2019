@@ -4,38 +4,40 @@ import kotlin.math.floor
 
 val MEM_SIZE = 1024
 
-fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toInt() }
+fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() }
 
-fun runComputer(programRaw: String, inputs: List<Int> = listOf(), debug: Boolean = false): List<Int> {
+fun runComputer(programRaw: String, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> {
     val program = inputStringToList(programRaw)
     return runComputer(program, inputs, debug)
 }
 
-fun runComputer(program: List<Int>, inputs: List<Int> = listOf(), debug: Boolean = false): List<Int> {
+fun runComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> {
     // Pad memory out to more than just the program
-    val memPad = (0 until MEM_SIZE - program.count()).map { 0 }
+    val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
     val comp = State(memory = program.plus(memPad), inputs = inputs, debug = debug)
     val result = comp.run()
     return result.outputs
 }
 
 data class State(
-    val memory: List<Int>,
+    val memory: List<Long>,
     val currentPos: Int = 0,
     val status: String = "running",
     val currentRelBase: Int = 0,
-    val inputs: List<Int> = listOf(),
+    val inputs: List<Long> = listOf(),
     val inputPtr: Int = 0,
-    val outputs: List<Int> = listOf(),
+    val outputs: List<Long> = listOf(),
     val debug: Boolean = false
 ) {
-    fun isDone() = currentPos >= memory.count() || memory[currentPos] == 99
+    fun isDone() = currentPos >= memory.count() || memory[currentPos] == 99L
 
-    fun currentInstruction() = memory[currentPos]
+    fun currentInstruction() = memory[currentPos].toInt()
 
     fun currentOpCode() = _getOpcodeFromInstruction(currentInstruction())
 
     fun valueAt(position: Int) = memory[position]
+
+    fun valueAt(position: Long) = memory[position.toInt()]
 
     fun run(): State =
         generateSequence(this) {
@@ -51,14 +53,14 @@ data class State(
             applyOpcode(this)
         }
 
-    fun copyWithNewValueAt(position: Int, newValue: Int) = this.copy(
+    fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
         memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
         currentPos = currentPos + opcodeLength(currentOpCode())
     )
 
     fun memoryAsString() = memory.joinToString(",") { it.toString() }
 
-    fun getInParam(paramOrd: Int): Int {
+    fun getInParam(paramOrd: Int): Long {
         val mode = _getParamModes(currentInstruction())[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(valueAt(currentPos + paramOrd))
@@ -71,7 +73,7 @@ data class State(
     fun getOutPos(paramOrd: Int): Int {
         val mode = _getParamModes(currentInstruction())[paramOrd - 1]
         return when (mode) {
-            0    -> valueAt(currentPos + paramOrd)
+            0    -> valueAt(currentPos + paramOrd).toInt()
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
@@ -155,13 +157,13 @@ fun applyOutput(state: State): State {
 fun applyJumpIfTrue(state: State): State {
     val checkVal = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-true $checkVal")
-    return if (checkVal != 0) applyJump(state) else advancePastJump(state)
+    return if (checkVal != 0L) applyJump(state) else advancePastJump(state)
 }
 
 fun applyJumpIfFalse(state: State): State {
     val checkVal = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-false $checkVal")
-    return if (checkVal == 0) applyJump(state) else advancePastJump(state)
+    return if (checkVal == 0L) applyJump(state) else advancePastJump(state)
 }
 
 fun advancePastJump(state: State): State {
@@ -170,7 +172,7 @@ fun advancePastJump(state: State): State {
 }
 
 fun applyJump(state: State): State {
-    val jumpTarget = state.getInParam(2)
+    val jumpTarget = state.getInParam(2).toInt()
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jumping to &$jumpTarget")
     return state.copy(currentPos = jumpTarget)
 }
@@ -179,7 +181,7 @@ fun applyLessThan(state: State): State {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
-    val result = if (x < y) 1 else 0
+    val result = if (x < y) 1L else 0L
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
@@ -188,7 +190,7 @@ fun applyEqual(state: State): State {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
-    val result = if (x == y) 1 else 0
+    val result = if (x == y) 1L else 0L
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] equality-check result $result, storing result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
@@ -197,7 +199,7 @@ fun applyChangeRelBase(state: State): State {
     val a = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] changing relative base by $a")
     return state.copy(
-        currentRelBase = state.currentRelBase + a,
+        currentRelBase = state.currentRelBase + a.toInt(),
         currentPos = state.currentPos + opcodeLength(state.currentOpCode())
     )
 }

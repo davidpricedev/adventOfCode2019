@@ -2,6 +2,7 @@ package advent2019.day5
 
 import advent2019.IntCode.State
 import advent2019.IntCode.inputStringToList
+import advent2019.IntCode.runComputer
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec
 import io.kotlintest.data.forall
@@ -41,8 +42,7 @@ class Day5Test : FreeSpec(
                     row("3,3,1107,-1,8,3,4,3,99", 1, 1),
                     row("3,3,1107,-1,8,3,4,3,99", 12, 0)
                 ) { program, input, expected ->
-                    val programList = inputStringToList(program)
-                    run(programList, input) shouldBe expected
+                    runComputer(program, listOf(input.toLong()))[0] shouldBe expected.toLong()
                 }
             }
             "simple jump examples" {
@@ -58,8 +58,7 @@ class Day5Test : FreeSpec(
                     row("1106,0,6,4,5,99,4,0,99", 1, 1106),
                     row("1106,1,6,4,5,99,4,0,99", 1, 99)
                 ) { program, input, expected ->
-                    val programList = inputStringToList(program)
-                    run(programList, input) shouldBe expected
+                    runComputer(program, listOf(input.toLong()))[0] shouldBe expected.toLong()
                 }
             }
             "longer example" {
@@ -72,8 +71,7 @@ class Day5Test : FreeSpec(
                     row(9, 1001),
                     row(1234, 1001)
                 ) { input, expected ->
-                    val programList = inputStringToList(program)
-                    run(programList, input) shouldBe expected
+                    runComputer(program, listOf(input.toLong()))[0] shouldBe expected.toLong()
                 }
             }
         }

@@ -10,10 +10,10 @@ fun main() {
     println(findInputsForGivenOutput())
 }
 
-fun findInputsForGivenOutput(): Int {
-    val output = 19690720
-    for (x in 0..99) {
-        for (y in 0..99) {
+fun findInputsForGivenOutput(): Long {
+    val output = 19690720L
+    for (x in 0..99L) {
+        for (y in 0..99L) {
             val result = run(x, y)
             if (result == output) {
                 println("$x, $y -> $result")
@@ -24,12 +24,12 @@ fun findInputsForGivenOutput(): Int {
     return -1
 }
 
-fun run(noun: Int, verb: Int) = State(get_real_program(noun, verb)).run().memory[0]
+fun run(noun: Long, verb: Long) = State(get_real_program(noun, verb)).run().memory[0]
 
 /**
  * Deal with the replacement insanity
  */
-fun get_real_program(noun: Int, verb: Int) =
+fun get_real_program(noun: Long, verb: Long) =
     inputStringToList(get_bogus_program()).mapIndexed { i, x ->
         if (i == 1) noun else if (i == 2) verb else x
     }
