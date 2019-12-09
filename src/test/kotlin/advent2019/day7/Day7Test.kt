@@ -1,7 +1,5 @@
 package advent2019.day7
 
-import advent2019.IntCode.State
-import advent2019.IntCode.applyOpcodes
 import advent2019.IntCode.inputStringToList
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec

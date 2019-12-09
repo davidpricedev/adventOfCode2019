@@ -2,6 +2,7 @@ package advent2019.day7
 
 import advent2019.IntCode.State
 import advent2019.IntCode.inputStringToList
+import advent2019.IntCode.runComputer
 
 fun main() {
     // part1
@@ -23,11 +24,7 @@ fun runAmpSeries(program: List<Int>, settings: List<Int>): Int {
     return amp5Signal
 }
 
-fun runAmp(program: List<Int>, signal: Int, setting: Int): Int {
-    val comp = State(program, inputs = listOf(setting, signal))
-    val result = comp.run()
-    return result.outputs.last()
-}
+fun runAmp(program: List<Int>, signal: Int, setting: Int) = runComputer(program, listOf(setting, signal)).last()
 
 /**
  * Borrowed from https://code.sololearn.com/c24EP02YuQx3/#kt

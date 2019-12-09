@@ -2,17 +2,28 @@ package advent2019.IntCode
 
 import kotlin.math.floor
 
+val MEM_SIZE = 1024
+
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toInt() }
 
-fun applyOpcodes(inputMem: List<Int>) =
-    generateSequence(State(inputMem)) {
-        it.runNext().takeIf { x -> x.status != "halted" }
-    }.toList().last()
+fun runComputer(programRaw: String, inputs: List<Int> = listOf(), debug: Boolean = false): List<Int> {
+    val program = inputStringToList(programRaw)
+    return runComputer(program, inputs, debug)
+}
+
+fun runComputer(program: List<Int>, inputs: List<Int> = listOf(), debug: Boolean = false): List<Int> {
+    // Pad memory out to more than just the program
+    val memPad = (0 until MEM_SIZE - program.count()).map { 0 }
+    val comp = State(memory = program.plus(memPad), inputs = inputs, debug = debug)
+    val result = comp.run()
+    return result.outputs
+}
 
 data class State(
     val memory: List<Int>,
     val currentPos: Int = 0,
     val status: String = "running",
+    val currentRelBase: Int = 0,
     val inputs: List<Int> = listOf(),
     val inputPtr: Int = 0,
     val outputs: List<Int> = listOf(),
@@ -52,6 +63,7 @@ data class State(
         return when (mode) {
             0    -> valueAt(valueAt(currentPos + paramOrd))
             1    -> valueAt(currentPos + paramOrd)
+            2    -> valueAt(currentRelBase + valueAt(currentPos + paramOrd))
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode is unknown")
         }
     }
@@ -60,8 +72,7 @@ data class State(
         val mode = _getParamModes(currentInstruction())[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd)
-            1    -> currentPos + paramOrd
-            else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode is unknown")
+            else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
 }
@@ -75,6 +86,7 @@ fun applyOpcode(state: State) = when (state.currentOpCode()) {
     6    -> applyJumpIfFalse(state)
     7    -> applyLessThan(state)
     8    -> applyEqual(state)
+    9    -> applyChangeRelBase(state)
     else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${state.currentOpCode()} is unknown")
 }
 
@@ -87,6 +99,7 @@ fun opcodeLength(opcode: Int): Int = when (opcode) {
     6    -> 3
     7    -> 4
     8    -> 4
+    9    -> 2
     else -> 1
 }
 
@@ -109,7 +122,7 @@ fun applyAdd(state: State): State {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
-    if (state.debug) println("[${state.currentPos}] adding $x to $y, result to &$outaddr")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] adding $x to $y, result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = x + y)
 }
 
@@ -117,14 +130,14 @@ fun applyMultiply(state: State): State {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
-    if (state.debug) println("[${state.currentPos}] multiplying $x to $y, result to &$outaddr")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] multiplying $x to $y, result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = x * y)
 }
 
 fun applyInput(state: State): State {
     val outaddr = state.getOutPos(1)
     val inputVal = state.inputs[state.inputPtr]
-    if (state.debug) println("[${state.currentPos}] inputing $inputVal result to &$outaddr")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] inputing $inputVal result to &$outaddr")
     return state
         .copyWithNewValueAt(position = outaddr, newValue = inputVal)
         .copy(inputPtr = state.inputPtr + 1)
@@ -132,7 +145,7 @@ fun applyInput(state: State): State {
 
 fun applyOutput(state: State): State {
     val outval = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}] outputing $outval")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] outputing $outval")
     return state.copy(
         outputs = state.outputs.plus(outval),
         currentPos = state.currentPos + opcodeLength(state.currentOpCode())
@@ -141,24 +154,24 @@ fun applyOutput(state: State): State {
 
 fun applyJumpIfTrue(state: State): State {
     val checkVal = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}] jump-if-true $checkVal")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-true $checkVal")
     return if (checkVal != 0) applyJump(state) else advancePastJump(state)
 }
 
 fun applyJumpIfFalse(state: State): State {
     val checkVal = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}] jump-if-false $checkVal")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-false $checkVal")
     return if (checkVal == 0) applyJump(state) else advancePastJump(state)
 }
 
 fun advancePastJump(state: State): State {
-    if (state.debug) println("[${state.currentPos}] jump-check failed")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-check failed")
     return state.copy(currentPos = state.currentPos + opcodeLength(state.currentOpCode()))
 }
 
 fun applyJump(state: State): State {
     val jumpTarget = state.getInParam(2)
-    if (state.debug) println("[${state.currentPos}] jumping to &$jumpTarget")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jumping to &$jumpTarget")
     return state.copy(currentPos = jumpTarget)
 }
 
@@ -167,7 +180,7 @@ fun applyLessThan(state: State): State {
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
     val result = if (x < y) 1 else 0
-    if (state.debug) println("[${state.currentPos}] lessthan-check result $result, storing result to &$outaddr")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
 
@@ -176,6 +189,15 @@ fun applyEqual(state: State): State {
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
     val result = if (x == y) 1 else 0
-    if (state.debug) println("[${state.currentPos}] equality-check result $result, storing result to &$outaddr")
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] equality-check result $result, storing result to &$outaddr")
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
+}
+
+fun applyChangeRelBase(state: State): State {
+    val a = state.getInParam(1)
+    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] changing relative base by $a")
+    return state.copy(
+        currentRelBase = state.currentRelBase + a,
+        currentPos = state.currentPos + opcodeLength(state.currentOpCode())
+    )
 }
