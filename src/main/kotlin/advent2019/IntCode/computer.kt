@@ -14,6 +14,8 @@ fun runComputer(programRaw: String, inputs: List<Long> = listOf(), debug: Boolea
 fun runComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> {
     // Pad memory out to more than just the program
     val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
+    if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
+
     val comp = State(memory = program.plus(memPad), inputs = inputs, debug = debug)
     val result = comp.run()
     return result.outputs
@@ -29,8 +31,6 @@ data class State(
     val outputs: List<Long> = listOf(),
     val debug: Boolean = false
 ) {
-    fun isDone() = currentPos >= memory.count() || memory[currentPos] == 99L
-
     fun currentInstruction() = memory[currentPos].toInt()
 
     fun currentOpCode() = _getOpcodeFromInstruction(currentInstruction())
@@ -44,14 +44,10 @@ data class State(
             it.runNext().takeIf { x -> x.status != "halted" }
         }.toList().last()
 
-    fun runNext(): State =
-        if (isDone()) {
-            if (debug) println("halting")
-            State(memory, currentPos, "halted")
-        } else {
-            if (debug) println(this)
-            applyOpcode(this)
-        }
+    fun runNext(): State {
+        if (debug) println(this)
+        return applyOpcode(this)
+    }
 
     fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
         memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
@@ -74,6 +70,7 @@ data class State(
         val mode = _getParamModes(currentInstruction())[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd).toInt()
+            2    -> valueAt(currentRelBase + valueAt(currentPos + paramOrd)).toInt()
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
@@ -89,6 +86,7 @@ fun applyOpcode(state: State) = when (state.currentOpCode()) {
     7    -> applyLessThan(state)
     8    -> applyEqual(state)
     9    -> applyChangeRelBase(state)
+    99   -> applyHalt(state)
     else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${state.currentOpCode()} is unknown")
 }
 
@@ -102,7 +100,8 @@ fun opcodeLength(opcode: Int): Int = when (opcode) {
     7    -> 4
     8    -> 4
     9    -> 2
-    else -> 1
+    99   -> 1
+    else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode $opcode is unknown")
 }
 
 fun _getOpcodeFromInstruction(inst: Int): Int {
@@ -202,4 +201,9 @@ fun applyChangeRelBase(state: State): State {
         currentRelBase = state.currentRelBase + a.toInt(),
         currentPos = state.currentPos + opcodeLength(state.currentOpCode())
     )
+}
+
+fun applyHalt(state: State): State {
+    if (state.debug) println("halting (99)")
+    return state.copy(status = "halted")
 }

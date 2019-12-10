@@ -34,8 +34,8 @@ fun asciiViz(imgData: List<Int>, width: Int) {
         .map {
             // Make black and white clearly distinguishable
             when (it) {
-                0    -> "."
-                1    -> "8"
+                0    -> "   "
+                1    -> "<#>"
                 else -> "/"
             }
         }
