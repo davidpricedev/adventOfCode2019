@@ -2,7 +2,7 @@ package advent2019.IntCode
 
 import kotlin.math.floor
 
-val MEM_SIZE = 1024
+val MEM_SIZE = 2048
 
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() }
 
@@ -70,7 +70,7 @@ data class State(
         val mode = _getParamModes(currentInstruction())[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd).toInt()
-            2    -> valueAt(currentRelBase + valueAt(currentPos + paramOrd)).toInt()
+            2    -> (currentRelBase + valueAt(currentPos + paramOrd)).toInt()
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
@@ -136,6 +136,8 @@ fun applyMultiply(state: State): State {
 }
 
 fun applyInput(state: State): State {
+    if (state.inputs.count() == 0 || state.inputPtr >= state.inputs.count())
+        throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input that doesn't exist")
     val outaddr = state.getOutPos(1)
     val inputVal = state.inputs[state.inputPtr]
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] inputing $inputVal result to &$outaddr")

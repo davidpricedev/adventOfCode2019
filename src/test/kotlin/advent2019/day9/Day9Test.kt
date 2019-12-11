@@ -21,5 +21,27 @@ class Day9Test : FreeSpec(
                     runComputer(program) shouldBe expected
                 }
             }
+            "Test cases borrowed from reddit" {
+                // https://www.reddit.com/r/adventofcode/comments/e8aw9j/2019_day_9_part_1_how_to_fix_203_error/fac3294/?utm_source=share&utm_medium=web2x
+                forall(
+                    row(listOf(109L, -1, 4, 1, 99), listOf(-1L)),
+                    row(listOf(109L, -1, 104, 1, 99), listOf(1L)),
+                    row(listOf(109L, -1, 204, 1, 99), listOf(109L)),
+                    row(listOf(109L, 1, 9, 2, 204, -6, 99), listOf(204L)),
+                    row(listOf(109L, 1, 109, 9, 204, -6, 99), listOf(204L)),
+                    row(listOf(109L, 1, 209, -1, 204, -106, 99), listOf(204L))
+                ) { program, expected ->
+                    runComputer(program) shouldBe expected
+                }
+            }
+            "More Test cases borrowed from reddit" {
+                // https://www.reddit.com/r/adventofcode/comments/e8aw9j/2019_day_9_part_1_how_to_fix_203_error/fac3294/?utm_source=share&utm_medium=web2x
+                forall(
+                    row(listOf(109L, 1, 3, 3, 204, 2, 99), listOf(1234L), listOf(1234L)),
+                    row(listOf(109L, 1, 203, 2, 204, 2, 99), listOf(1234L), listOf(1234L))
+                ) { program, input, expected ->
+                runComputer(program, input, debug = true) shouldBe expected
+            }
+            }
         }
     })

@@ -3,7 +3,10 @@ package advent2019.day9
 import advent2019.IntCode.runComputer
 
 fun main() {
+    // part1
     println(runComputer(getProgram(), listOf(1L)))
+    // part2
+    println(runComputer(getProgram(), listOf(2L)))
 }
 
 fun getProgram() =
