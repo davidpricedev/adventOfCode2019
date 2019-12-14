@@ -6,7 +6,7 @@ import io.kotlintest.specs.FreeSpec
 import io.kotlintest.tables.row
 import kotlin.math.PI
 
-class Day10Test : FreeSpec(
+class Day12Test : FreeSpec(
     {
         "Part1" - {
             "One Dimension Velocity Change" {
