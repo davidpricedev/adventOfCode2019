@@ -1,28 +1,69 @@
 package advent2019.day14
 
 import kotlin.math.ceil
+import kotlin.math.pow
 
+/**
+ * Part 2 Notes:
+ * naive option of starting fuel gueses at 1T/ore-for-1-fuel and incrementing up from there is waaaay to slow
+ * I could look for a way to turn my logic inside out maybe?
+ * Maybe there is an LCM/GCF solution in there somewhere? The more I think about it the more I'm certain there is
+ *  and that that is probably the way I'm supposed to solve it.
+ * The other option would be to narrow in on the answer by varying the increments too - instead of +1, start with +10^n
+ *  and decrement n as we overshoot
+ */
 fun main() {
     // part1
     println(calculateOreNeeded(getInputReactions()))
+    // part2
+    println(optimizeForOre(getInputReactions()))
 }
 
 data class ChemState(
     val reactions: Map<String, Reaction>,
-    val needs: Map<String, Int>,
-    val has: Map<String, Int> = mapOf()
+    val needs: Map<String, Long>,
+    val has: Map<String, Long> = mapOf()
 ) {
     // Done when only ore is needed
     fun isDone() = needs.count() == 1 && needs.keys.first() == "ORE"
 }
 
-fun calculateOreNeeded(reactions: Map<String, Reaction>, debug: Boolean = false): Int {
-    val init = ChemState(reactions, needs = mapOf("FUEL" to 1))
+fun calculateOreNeeded(reactions: Map<String, Reaction>, fuelNeeded: Long = 1L, debug: Boolean = false): Long {
+    val init = ChemState(reactions, needs = mapOf("FUEL" to fuelNeeded))
     return generateSequence(init) { state ->
         if (debug) println(state)
         calculateNext(state).takeIf { !state.isDone() }
     }.last().needs.values.first()
 }
+
+/**
+ * Narrow in on the right answer by making big jumps and slowly scaling back the size of the jumps we are making
+ */
+fun optimizeForOre(reactions: Map<String, Reaction>, debug: Boolean = true): Long {
+    val oreProvided = 1000000000000
+    val oreFor1Fuel = calculateOreNeeded(reactions)
+    val startingFuelGuess = oreProvided / oreFor1Fuel
+    var guess = startingFuelGuess
+    for (n in 8 downTo  0) {
+        for (i in guess..Long.MAX_VALUE step 10L.pow(n)) {
+            val result = calculateOreNeeded(reactions, i)
+            if (debug) println("$i fuel requires $result ore")
+            if (result < oreProvided) {
+                // make sure guess is always the highest fuel value that hasn't exceeded ore provided
+                guess = i
+            } else if (n == 0) {
+                // incrementing is down to 1 so we've found the highest fuel inside the ore limits
+                return guess
+            } else {
+                // we've gone as far as we can with increment of 10^n, time to decrease n
+                break
+            }
+        }
+    }
+    return -1
+}
+
+private fun Long.pow(n: Int): Long = this.toDouble().pow(n).toLong()
 
 fun calculateNext(state: ChemState): ChemState {
     if (state.isDone()) return state
@@ -41,7 +82,7 @@ fun calculateNext(state: ChemState): ChemState {
     return state.copy(needs = nextNeeds, has = nextHas)
 }
 
-fun combineMaps(baseMap: Map<String, Int>, additional: Map<String, Int>): Map<String, Int> =
+fun combineMaps(baseMap: Map<String, Long>, additional: Map<String, Long>): Map<String, Long> =
     (baseMap.asSequence() + additional.asSequence()).groupBy({ it.key }, { it.value }).mapValues { it.value.sum() }
 
 fun parseInput(rawInput: String) =
@@ -49,19 +90,19 @@ fun parseInput(rawInput: String) =
         .map { Reaction.parse(it) }
         .map { it.output.name to it }.toMap()
 
-data class ChemAmt(val name: String, val amount: Int) {
+data class ChemAmt(val name: String, val amount: Long) {
     companion object {
         fun parse(chemAmtStr: String): ChemAmt {
             val info = chemAmtStr.split(" ")
-            return ChemAmt(name = info.last(), amount = info.first().toInt())
+            return ChemAmt(name = info.last(), amount = info.first().toLong())
         }
     }
 }
 
 data class Reaction(val inputs: List<ChemAmt>, val output: ChemAmt) {
-    fun reactionsNeededToProduce(n: Int) = ceil(n.toDouble() / output.amount).toInt()
+    fun reactionsNeededToProduce(n: Long) = ceil(n.toDouble() / output.amount).toLong()
 
-    fun newNeeds(n: Int) = inputs.map { it.name to it.amount * n }.toMap()
+    fun newNeeds(n: Long) = inputs.map { it.name to it.amount * n }.toMap()
 
     companion object {
         fun parse(reactionStr: String): Reaction {
