@@ -1,7 +1,7 @@
 package advent2019.day14
 
+import advent2019.util.pow
 import kotlin.math.ceil
-import kotlin.math.pow
 
 /**
  * Part 2 Notes:
@@ -62,8 +62,6 @@ fun optimizeForOre(reactions: Map<String, Reaction>, debug: Boolean = true): Lon
     }
     return -1
 }
-
-private fun Long.pow(n: Int): Long = this.toDouble().pow(n).toLong()
 
 fun calculateNext(state: ChemState): ChemState {
     if (state.isDone()) return state

@@ -1,5 +1,6 @@
 package advent2019.IntCode
 
+import advent2019.util.toCharStringList
 import kotlin.math.floor
 
 val MEM_SIZE = 2048
@@ -33,7 +34,7 @@ data class ICComp(
 ) {
     fun currentInstruction() = memory[currentPos].toInt()
 
-    fun currentOpCode() = _getOpcodeFromInstruction(currentInstruction())
+    fun currentOpCode() = currentInstruction() - (100 * (currentInstruction() / 100))
 
     fun valueAt(position: Int) = memory[position]
 
@@ -46,7 +47,7 @@ data class ICComp(
 
     fun runNext(): ICComp {
         if (debug) println(this)
-        return applyOpcode(this)
+        return applyOpcode()
     }
 
     fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
@@ -57,7 +58,7 @@ data class ICComp(
     fun memoryAsString() = memory.joinToString(",") { it.toString() }
 
     fun getInParam(paramOrd: Int): Long {
-        val mode = _getParamModes(currentInstruction())[paramOrd - 1]
+        val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(valueAt(currentPos + paramOrd))
             1    -> valueAt(currentPos + paramOrd)
@@ -67,145 +68,136 @@ data class ICComp(
     }
 
     fun getOutPos(paramOrd: Int): Int {
-        val mode = _getParamModes(currentInstruction())[paramOrd - 1]
+        val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd).toInt()
             2    -> (currentRelBase + valueAt(currentPos + paramOrd)).toInt()
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
-}
 
-fun applyOpcode(state: ICComp) = when (state.currentOpCode()) {
-    1    -> applyAdd(state)
-    2    -> applyMultiply(state)
-    3    -> applyInput(state)
-    4    -> applyOutput(state)
-    5    -> applyJumpIfTrue(state)
-    6    -> applyJumpIfFalse(state)
-    7    -> applyLessThan(state)
-    8    -> applyEqual(state)
-    9    -> applyChangeRelBase(state)
-    99   -> applyHalt(state)
-    else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${state.currentOpCode()} is unknown")
-}
+    fun applyOpcode() = when (currentOpCode()) {
+        1    -> applyAdd()
+        2    -> applyMultiply()
+        3    -> applyInput()
+        4    -> applyOutput()
+        5    -> applyJumpIfTrue()
+        6    -> applyJumpIfFalse()
+        7    -> applyLessThan()
+        8    -> applyEqual()
+        9    -> applyChangeRelBase()
+        99   -> applyHalt()
+        else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${currentOpCode()} is unknown")
+    }
 
-fun opcodeLength(opcode: Int): Int = when (opcode) {
-    1    -> 4
-    2    -> 4
-    3    -> 2
-    4    -> 2
-    5    -> 3
-    6    -> 3
-    7    -> 4
-    8    -> 4
-    9    -> 2
-    99   -> 1
-    else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode $opcode is unknown")
-}
+    fun opcodeLength(opcode: Int): Int = when (opcode) {
+        1    -> 4
+        2    -> 4
+        3    -> 2
+        4    -> 2
+        5    -> 3
+        6    -> 3
+        7    -> 4
+        8    -> 4
+        9    -> 2
+        99   -> 1
+        else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode $opcode is unknown")
+    }
 
-fun _getOpcodeFromInstruction(inst: Int): Int {
-    val paramModes = floor(inst / 100.0)
-    return inst - (100 * paramModes).toInt()
-}
+    fun getParamModes() =
+        ("000" + currentInstruction() / 100)
+            .reversed()
+            .substring(0, 3)
+            .toCharStringList()
+            .map { it.toInt() }
 
-fun _getParamModes(inst: Int): List<Int> {
-    val paddedStr = ("000" + floor(inst / 100.0).toInt().toString()).reversed().substring(0, 3)
-    return _splitToList(paddedStr).map { it.toInt() }
-}
+    fun applyAdd(): ICComp {
+        val x = getInParam(1)
+        val y = getInParam(2)
+        val outaddr = getOutPos(3)
+        if (debug) println("[${currentPos}, ${currentRelBase}] adding $x to $y, result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = x + y)
+    }
 
-fun _splitToList(str: String): List<String> {
-    val rawlist = str.split("")
-    return rawlist.subList(1, rawlist.count() - 1)
-}
+    fun applyMultiply(): ICComp {
+        val x = getInParam(1)
+        val y = getInParam(2)
+        val outaddr = getOutPos(3)
+        if (debug) println("[${currentPos}, ${currentRelBase}] multiplying $x to $y, result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = x * y)
+    }
 
-fun applyAdd(state: ICComp): ICComp {
-    val x = state.getInParam(1)
-    val y = state.getInParam(2)
-    val outaddr = state.getOutPos(3)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] adding $x to $y, result to &$outaddr")
-    return state.copyWithNewValueAt(position = outaddr, newValue = x + y)
-}
+    fun applyInput(): ICComp {
+        if (inputs.count() == 0 || inputPtr >= inputs.count())
+            throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input that doesn't exist")
+        val outaddr = getOutPos(1)
+        val inputVal = inputs[inputPtr]
+        if (debug) println("[${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = inputVal)
+            .copy(inputPtr = inputPtr + 1)
+    }
 
-fun applyMultiply(state: ICComp): ICComp {
-    val x = state.getInParam(1)
-    val y = state.getInParam(2)
-    val outaddr = state.getOutPos(3)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] multiplying $x to $y, result to &$outaddr")
-    return state.copyWithNewValueAt(position = outaddr, newValue = x * y)
-}
+    fun applyOutput(): ICComp {
+        val outval = getInParam(1)
+        if (debug) println("[${currentPos}, ${currentRelBase}] outputing $outval")
+        return copy(
+            outputs = outputs.plus(outval),
+            currentPos = currentPos + opcodeLength(currentOpCode())
+        )
+    }
 
-fun applyInput(state: ICComp): ICComp {
-    if (state.inputs.count() == 0 || state.inputPtr >= state.inputs.count())
-        throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input that doesn't exist")
-    val outaddr = state.getOutPos(1)
-    val inputVal = state.inputs[state.inputPtr]
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] inputing $inputVal result to &$outaddr")
-    return state
-        .copyWithNewValueAt(position = outaddr, newValue = inputVal)
-        .copy(inputPtr = state.inputPtr + 1)
-}
+    fun applyJumpIfTrue(): ICComp {
+        val checkVal = getInParam(1)
+        if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-true $checkVal")
+        return if (checkVal != 0L) applyJump() else advancePastJump()
+    }
 
-fun applyOutput(state: ICComp): ICComp {
-    val outval = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] outputing $outval")
-    return state.copy(
-        outputs = state.outputs.plus(outval),
-        currentPos = state.currentPos + opcodeLength(state.currentOpCode())
-    )
-}
+    fun applyJumpIfFalse(): ICComp {
+        val checkVal = getInParam(1)
+        if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-false $checkVal")
+        return if (checkVal == 0L) applyJump() else advancePastJump()
+    }
 
-fun applyJumpIfTrue(state: ICComp): ICComp {
-    val checkVal = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-true $checkVal")
-    return if (checkVal != 0L) applyJump(state) else advancePastJump(state)
-}
+    fun advancePastJump(): ICComp {
+        if (debug) println("[${currentPos}, ${currentRelBase}] jump-check failed")
+        return copy(currentPos = currentPos + opcodeLength(currentOpCode()))
+    }
 
-fun applyJumpIfFalse(state: ICComp): ICComp {
-    val checkVal = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-false $checkVal")
-    return if (checkVal == 0L) applyJump(state) else advancePastJump(state)
-}
+    fun applyJump(): ICComp {
+        val jumpTarget = getInParam(2).toInt()
+        if (debug) println("[${currentPos}, ${currentRelBase}] jumping to &$jumpTarget")
+        return copy(currentPos = jumpTarget)
+    }
 
-fun advancePastJump(state: ICComp): ICComp {
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-check failed")
-    return state.copy(currentPos = state.currentPos + advent2019.rxIntCode.opcodeLength(state.currentOpCode()))
-}
+    fun applyLessThan(): ICComp {
+        val x = getInParam(1)
+        val y = getInParam(2)
+        val outaddr = getOutPos(3)
+        val result = if (x < y) 1L else 0L
+        if (debug) println("[${currentPos}, ${currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = result)
+    }
 
-fun applyJump(state: ICComp): ICComp {
-    val jumpTarget = state.getInParam(2).toInt()
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jumping to &$jumpTarget")
-    return state.copy(currentPos = jumpTarget)
-}
+    fun applyEqual(): ICComp {
+        val x = getInParam(1)
+        val y = getInParam(2)
+        val outaddr = getOutPos(3)
+        val result = if (x == y) 1L else 0L
+        if (debug) println("[${currentPos}, ${currentRelBase}] equality-check result $result, storing result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = result)
+    }
 
-fun applyLessThan(state: ICComp): ICComp {
-    val x = state.getInParam(1)
-    val y = state.getInParam(2)
-    val outaddr = state.getOutPos(3)
-    val result = if (x < y) 1L else 0L
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
-    return state.copyWithNewValueAt(position = outaddr, newValue = result)
-}
+    fun applyChangeRelBase(): ICComp {
+        val a = getInParam(1)
+        if (debug) println("[${currentPos}, ${currentRelBase}] changing relative base by $a")
+        return copy(
+            currentRelBase = currentRelBase + a.toInt(),
+            currentPos = currentPos + opcodeLength(currentOpCode())
+        )
+    }
 
-fun applyEqual(state: ICComp): ICComp {
-    val x = state.getInParam(1)
-    val y = state.getInParam(2)
-    val outaddr = state.getOutPos(3)
-    val result = if (x == y) 1L else 0L
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] equality-check result $result, storing result to &$outaddr")
-    return state.copyWithNewValueAt(position = outaddr, newValue = result)
-}
-
-fun applyChangeRelBase(state: ICComp): ICComp {
-    val a = state.getInParam(1)
-    if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] changing relative base by $a")
-    return state.copy(
-        currentRelBase = state.currentRelBase + a.toInt(),
-        currentPos = state.currentPos + opcodeLength(state.currentOpCode())
-    )
-}
-
-fun applyHalt(state: ICComp): ICComp {
-    if (state.debug) println("halting (99)")
-    return state.copy(status = "halted")
+    fun applyHalt(): ICComp {
+        if (debug) println("halting (99)")
+        return copy(status = "halted")
+    }
 }

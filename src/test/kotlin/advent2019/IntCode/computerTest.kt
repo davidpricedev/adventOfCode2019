@@ -26,7 +26,8 @@ class IntCodeTest : FreeSpec(
                    row(11102, 2),
                    row(2, 2)
                 ) { input, expected ->
-                    _getOpcodeFromInstruction(input) shouldBe expected
+                    val state = ICComp(memory=listOf(input.toLong()))
+                    state.currentOpCode() shouldBe expected
                 }
             }
         }
@@ -42,7 +43,8 @@ class IntCodeTest : FreeSpec(
                     row(1102, listOf(1,1,0)),
                     row(11102, listOf(1,1,1))
                 ) { input, expected ->
-                    _getParamModes(input) shouldBe expected
+                    val state = ICComp(memory=listOf(input.toLong()))
+                    state.getParamModes() shouldBe expected
                 }
             }
         }
