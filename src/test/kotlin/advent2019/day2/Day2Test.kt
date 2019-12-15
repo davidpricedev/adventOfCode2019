@@ -1,7 +1,7 @@
 package advent2019.day2
 
-import advent2019.IntCode.State
 import advent2019.IntCode.inputStringToList
+import advent2019.IntCode.ICComp
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec
 import io.kotlintest.data.forall
@@ -17,7 +17,7 @@ class Day2Test : FreeSpec(
                     row("2,4,4,5,99,0", "2,4,4,5,99,9801"),
                     row("1,1,1,4,99,5,6,0,99", "30,1,1,4,2,5,6,0,99")
                 ) { input, expected ->
-                    State(inputStringToList(input)).run().memoryAsString() shouldBe expected
+                    ICComp(inputStringToList(input)).run().memoryAsString() shouldBe expected
                 }
             }
         }

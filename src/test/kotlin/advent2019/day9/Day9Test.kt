@@ -1,9 +1,6 @@
 package advent2019.day9
 
-import advent2019.IntCode.inputStringToList
 import advent2019.IntCode.runComputer
-import advent2019.day3.calculateClosestIntersection
-import advent2019.day3.calculateShortestWire
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec
 import io.kotlintest.data.forall

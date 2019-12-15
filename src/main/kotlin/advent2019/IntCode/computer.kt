@@ -16,12 +16,12 @@ fun runComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boole
     val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
     if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
 
-    val comp = State(memory = program.plus(memPad), inputs = inputs, debug = debug)
+    val comp = ICComp(memory = program.plus(memPad), inputs = inputs, debug = debug)
     val result = comp.run()
     return result.outputs
 }
 
-data class State(
+data class ICComp(
     val memory: List<Long>,
     val currentPos: Int = 0,
     val status: String = "running",
@@ -39,12 +39,12 @@ data class State(
 
     fun valueAt(position: Long) = memory[position.toInt()]
 
-    fun run(): State =
+    fun run(): ICComp =
         generateSequence(this) {
             it.runNext().takeIf { x -> x.status != "halted" }
         }.toList().last()
 
-    fun runNext(): State {
+    fun runNext(): ICComp {
         if (debug) println(this)
         return applyOpcode(this)
     }
@@ -76,7 +76,7 @@ data class State(
     }
 }
 
-fun applyOpcode(state: State) = when (state.currentOpCode()) {
+fun applyOpcode(state: ICComp) = when (state.currentOpCode()) {
     1    -> applyAdd(state)
     2    -> applyMultiply(state)
     3    -> applyInput(state)
@@ -119,7 +119,7 @@ fun _splitToList(str: String): List<String> {
     return rawlist.subList(1, rawlist.count() - 1)
 }
 
-fun applyAdd(state: State): State {
+fun applyAdd(state: ICComp): ICComp {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
@@ -127,7 +127,7 @@ fun applyAdd(state: State): State {
     return state.copyWithNewValueAt(position = outaddr, newValue = x + y)
 }
 
-fun applyMultiply(state: State): State {
+fun applyMultiply(state: ICComp): ICComp {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
@@ -135,7 +135,7 @@ fun applyMultiply(state: State): State {
     return state.copyWithNewValueAt(position = outaddr, newValue = x * y)
 }
 
-fun applyInput(state: State): State {
+fun applyInput(state: ICComp): ICComp {
     if (state.inputs.count() == 0 || state.inputPtr >= state.inputs.count())
         throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input that doesn't exist")
     val outaddr = state.getOutPos(1)
@@ -146,7 +146,7 @@ fun applyInput(state: State): State {
         .copy(inputPtr = state.inputPtr + 1)
 }
 
-fun applyOutput(state: State): State {
+fun applyOutput(state: ICComp): ICComp {
     val outval = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] outputing $outval")
     return state.copy(
@@ -155,30 +155,30 @@ fun applyOutput(state: State): State {
     )
 }
 
-fun applyJumpIfTrue(state: State): State {
+fun applyJumpIfTrue(state: ICComp): ICComp {
     val checkVal = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-true $checkVal")
     return if (checkVal != 0L) applyJump(state) else advancePastJump(state)
 }
 
-fun applyJumpIfFalse(state: State): State {
+fun applyJumpIfFalse(state: ICComp): ICComp {
     val checkVal = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-if-false $checkVal")
     return if (checkVal == 0L) applyJump(state) else advancePastJump(state)
 }
 
-fun advancePastJump(state: State): State {
+fun advancePastJump(state: ICComp): ICComp {
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jump-check failed")
-    return state.copy(currentPos = state.currentPos + opcodeLength(state.currentOpCode()))
+    return state.copy(currentPos = state.currentPos + advent2019.rxIntCode.opcodeLength(state.currentOpCode()))
 }
 
-fun applyJump(state: State): State {
+fun applyJump(state: ICComp): ICComp {
     val jumpTarget = state.getInParam(2).toInt()
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] jumping to &$jumpTarget")
     return state.copy(currentPos = jumpTarget)
 }
 
-fun applyLessThan(state: State): State {
+fun applyLessThan(state: ICComp): ICComp {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
@@ -187,7 +187,7 @@ fun applyLessThan(state: State): State {
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
 
-fun applyEqual(state: State): State {
+fun applyEqual(state: ICComp): ICComp {
     val x = state.getInParam(1)
     val y = state.getInParam(2)
     val outaddr = state.getOutPos(3)
@@ -196,7 +196,7 @@ fun applyEqual(state: State): State {
     return state.copyWithNewValueAt(position = outaddr, newValue = result)
 }
 
-fun applyChangeRelBase(state: State): State {
+fun applyChangeRelBase(state: ICComp): ICComp {
     val a = state.getInParam(1)
     if (state.debug) println("[${state.currentPos}, ${state.currentRelBase}] changing relative base by $a")
     return state.copy(
@@ -205,7 +205,7 @@ fun applyChangeRelBase(state: State): State {
     )
 }
 
-fun applyHalt(state: State): State {
+fun applyHalt(state: ICComp): ICComp {
     if (state.debug) println("halting (99)")
     return state.copy(status = "halted")
 }

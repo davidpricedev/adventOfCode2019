@@ -1,7 +1,7 @@
 package advent2019.day2
 
-import advent2019.IntCode.State
 import advent2019.IntCode.inputStringToList
+import advent2019.IntCode.ICComp
 
 fun main() {
     // part 1
@@ -24,7 +24,7 @@ fun findInputsForGivenOutput(): Long {
     return -1
 }
 
-fun run(noun: Long, verb: Long) = State(get_real_program(noun, verb)).run().memory[0]
+fun run(noun: Long, verb: Long) = ICComp(get_real_program(noun, verb)).run().memory[0]
 
 /**
  * Deal with the replacement insanity

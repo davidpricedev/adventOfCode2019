@@ -9,13 +9,13 @@ class IntCodeTest : FreeSpec(
     {
         "State.getInParam" - {
             val input = "1002,4,3,4,33"
-            val state = State(inputStringToList(input))
+            val state = ICComp(inputStringToList(input))
             state.getInParam(1) shouldBe 33
             state.getInParam(2) shouldBe 3
         }
         "State.getOutPos" - {
             val input = "1002,4,3,4,33"
-            val state = State(inputStringToList(input))
+            val state = ICComp(inputStringToList(input))
             state.getOutPos(3) shouldBe 4
         }
         "_getOpcodeFromInstruction" - {
