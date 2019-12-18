@@ -3,82 +3,84 @@ package advent2019.coIntCode
 import advent2019.util.toCharStringList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
-import kotlinx.coroutines.channels.produce
 
 val MEM_SIZE = 2048
+val OUT_BUFFER = 200
 
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() }
 
-fun runComputer(programRaw: String, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> {
-    val program = inputStringToList(programRaw)
-    return runComputer(program, inputs, debug)
+fun runComputerAsync(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false) = GlobalScope.async {
+    val comp = init(program, debug)
+    launch { inputs.forEach { comp.inputChannel.send(it) } }
+    val result = runAsync(comp).await()
+    val outputs = channelBufferToList(result.outputChannel)
+    return@async outputs
 }
 
-/**
- * For use from code that doesn't want/need to care about coroutines and channels
- */
-fun runComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> {
-    // Pad memory out to more than just the program
-    val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
-    if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
-
-    val outputChannel = Channel<Long>()
-    val comp = CoICComp(
-        memory = program.plus(memPad),
-        inputChannel = produceInputs(inputs),
-        outputChannel = outputChannel,
-        debug = debug
-    )
-
-    var outputs = listOf<Long>()
-    runBlocking {
-        val result = run(comp)
-        outputs = result.outputChannel.toList()
-    }
+private fun CoroutineScope.channelBufferToList(channel: Channel<Long>): List<Long> {
+    val outputs = mutableListOf<Long>()
+    launch { while (!channel.isEmpty) outputs.add(channel.receive()) }
     return outputs
 }
 
-fun produceInputs(inputs: List<Long>) = produce { inputs.forEach {send(it)} }
+fun init(program: List<Long>, debug: Boolean = false): CoICComp {
+    // Pad memory out to more than just the program
+    val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
+    if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
+    return CoICComp(
+        memory = program.plus(memPad),
+        debug = debug
+    )
+}
 
-suspend fun run(startingState: CoICComp): CoICComp {
-    var state = startingState
-    while (state.status != "halted") {
+suspend fun runAsync(startingState: CoICComp): Deferred<CoICComp> = GlobalScope.async {
+    var state = startingState.copy(status = CompStatus.running)
+    var count = 0
+    while (state.status != CompStatus.halted) {
+        count++
+        println("Running program loop $count")
         state = state.runNext()
     }
-    return state
+    return@async state
+}
+
+enum class CompStatus {
+    ready,
+    running,
+    halted,
 }
 
 data class CoICComp(
     val memory: List<Long>,
     val currentPos: Int = 0,
-    val status: String = "running",
+    val status: CompStatus = CompStatus.ready,
     val currentRelBase: Int = 0,
-    val inputChannel: Channel<Long>,
-    val outputChannel: Channel<Long>,
+    val inputChannel: Channel<Long> = Channel(),
+    val outputChannel: Channel<Long> = Channel(OUT_BUFFER),
     val debug: Boolean = false
 ) {
 
-    suspend fun currentInstruction() = memory[currentPos].toInt()
+    fun currentInstruction() = memory[currentPos].toInt()
 
-    suspend fun currentOpCode() = currentInstruction() - (100 * (currentInstruction() / 100))
+    fun currentOpCode() = currentInstruction() - (100 * (currentInstruction() / 100))
 
-    suspend fun valueAt(position: Int) = memory[position]
+    fun valueAt(position: Int) = memory[position]
 
-    suspend fun valueAt(position: Long) = memory[position.toInt()]
+    fun valueAt(position: Long) = memory[position.toInt()]
 
     suspend fun runNext(): CoICComp {
         if (debug) println(this)
         return applyOpcode()
     }
 
-    suspend fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
+    fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
         memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
         currentPos = currentPos + opcodeLength()
     )
 
-    suspend fun memoryAsString() = memory.joinToString(",") { it.toString() }
+    fun memoryAsString() = memory.joinToString(",") { it.toString() }
 
-    suspend fun getInParam(paramOrd: Int): Long {
+    fun getInParam(paramOrd: Int): Long {
         val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(valueAt(currentPos + paramOrd))
@@ -88,7 +90,7 @@ data class CoICComp(
         }
     }
 
-    suspend fun getOutPos(paramOrd: Int): Int {
+    fun getOutPos(paramOrd: Int): Int {
         val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
             0    -> valueAt(currentPos + paramOrd).toInt()
@@ -97,7 +99,7 @@ data class CoICComp(
         }
     }
 
-    suspend fun getParamModes() =
+    fun getParamModes() =
         ("000" + currentInstruction() / 100)
             .reversed()
             .substring(0, 3)
@@ -118,7 +120,7 @@ data class CoICComp(
         else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${currentOpCode()} is unknown")
     }
 
-    suspend fun opcodeLength(): Int = when (currentOpCode()) {
+    fun opcodeLength(): Int = when (currentOpCode()) {
         1    -> 4
         2    -> 4
         3    -> 2
@@ -132,7 +134,7 @@ data class CoICComp(
         else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${currentOpCode()} is unknown")
     }
 
-    suspend fun applyAdd(): CoICComp {
+    fun applyAdd(): CoICComp {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
@@ -140,7 +142,7 @@ data class CoICComp(
         return copyWithNewValueAt(position = outaddr, newValue = x + y)
     }
 
-    suspend fun applyMultiply(): CoICComp {
+    fun applyMultiply(): CoICComp {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
@@ -162,30 +164,30 @@ data class CoICComp(
         return copy(currentPos = currentPos + opcodeLength())
     }
 
-    suspend fun applyJumpIfTrue(): CoICComp {
+    fun applyJumpIfTrue(): CoICComp {
         val checkVal = getInParam(1)
         if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-true $checkVal")
         return if (checkVal != 0L) applyJump() else advancePastJump()
     }
 
-    suspend fun applyJumpIfFalse(): CoICComp {
+    fun applyJumpIfFalse(): CoICComp {
         val checkVal = getInParam(1)
         if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-false $checkVal")
         return if (checkVal == 0L) applyJump() else advancePastJump()
     }
 
-    suspend fun advancePastJump(): CoICComp {
+    fun advancePastJump(): CoICComp {
         if (debug) println("[${currentPos}, ${currentRelBase}] jump-check failed")
         return copy(currentPos = currentPos + opcodeLength())
     }
 
-    suspend fun applyJump(): CoICComp {
+    fun applyJump(): CoICComp {
         val jumpTarget = getInParam(2).toInt()
         if (debug) println("[${currentPos}, ${currentRelBase}] jumping to &$jumpTarget")
         return copy(currentPos = jumpTarget)
     }
 
-    suspend fun applyLessThan(): CoICComp {
+    fun applyLessThan(): CoICComp {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
@@ -194,7 +196,7 @@ data class CoICComp(
         return copyWithNewValueAt(position = outaddr, newValue = result)
     }
 
-    suspend fun applyEqual(): CoICComp {
+    fun applyEqual(): CoICComp {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
@@ -203,7 +205,7 @@ data class CoICComp(
         return copyWithNewValueAt(position = outaddr, newValue = result)
     }
 
-    suspend fun applyChangeRelBase(): CoICComp {
+    fun applyChangeRelBase(): CoICComp {
         val a = getInParam(1)
         if (debug) println("[${currentPos}, ${currentRelBase}] changing relative base by $a")
         return copy(
@@ -212,8 +214,8 @@ data class CoICComp(
         )
     }
 
-    suspend fun applyHalt(): CoICComp {
+    fun applyHalt(): CoICComp {
         if (debug) println("halting (99)")
-        return copy(status = "halted")
+        return copy(status = CompStatus.halted)
     }
 }
