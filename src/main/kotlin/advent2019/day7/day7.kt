@@ -1,6 +1,9 @@
 package advent2019.day7
 
-import advent2019.IntCode.runComputer
+import advent2019.coIntCode.Computer
+import advent2019.coIntCode.Computer.Companion.runAsync
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 fun main() {
     // part1
@@ -8,21 +11,33 @@ fun main() {
 }
 
 fun optimize(program: String): Pair<List<Long>, Long> {
-    val possibleSettings = listOf(0L,1,2,3,4)
+    val possibleSettings = listOf(0L, 1, 2, 3, 4)
     val possiblePermutations = permute(possibleSettings)
-    return possiblePermutations.map { Pair(it, runAmpSeries(program, it) )}.maxBy { it.second } ?: Pair(listOf(9L), -1L)
+    return possiblePermutations.map { Pair(it, runAmpSeries(program, it)) }.maxBy { it.second } ?: Pair(listOf(9L), -1L)
 }
 
-fun runAmpSeries(program: String, settings: List<Long>): Long {
-    val amp1Signal = runAmp(program, 0, settings[0])
-    val amp2Signal = runAmp(program, amp1Signal, settings[1])
-    val amp3Signal = runAmp(program, amp2Signal, settings[2])
-    val amp4Signal = runAmp(program, amp3Signal, settings[3])
-    val amp5Signal = runAmp(program, amp4Signal, settings[4])
-    return amp5Signal
+fun runAmpSeries(program: String, settings: List<Long>): Long = runBlocking {
+    // initializing and wiring
+    val amp1 = Computer.init(program)
+    val amp2 = Computer.init(program).copy(inputChannel = amp1.outputChannel)
+    val amp3 = Computer.init(program).copy(inputChannel = amp2.outputChannel)
+    val amp4 = Computer.init(program).copy(inputChannel = amp3.outputChannel)
+    val amp5 = Computer.init(program).copy(inputChannel = amp4.outputChannel)
+    // Setup the initial inputs
+    launch {
+        amp1.inputChannel.send(settings[0])
+        amp1.inputChannel.send(0)
+    }
+    launch { amp2.inputChannel.send(settings[1]) }
+    launch { amp3.inputChannel.send(settings[2]) }
+    launch { amp4.inputChannel.send(settings[3]) }
+    launch { amp5.inputChannel.send(settings[4]) }
+    // Start the computers
+    listOf(amp1, amp2, amp3, amp4).map { runAsync(it) }
+    val amp5FinalState = runAsync(amp5).await()
+    val amp5Output = amp5FinalState.outputs
+    return@runBlocking amp5Output.first()
 }
-
-fun runAmp(program: String, signal: Long, setting: Long) = runComputer(program, listOf(setting, signal)).last()
 
 /**
  * Borrowed from https://code.sololearn.com/c24EP02YuQx3/#kt

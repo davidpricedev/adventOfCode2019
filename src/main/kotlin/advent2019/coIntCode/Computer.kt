@@ -9,39 +9,14 @@ val OUT_BUFFER = 200
 
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() }
 
-fun runComputerAsync(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false) = GlobalScope.async {
-    val comp = init(program, debug)
-    launch { inputs.forEach { comp.inputChannel.send(it) } }
-    val result = runAsync(comp).await()
-    val outputs = channelBufferToList(result.outputChannel)
-    return@async outputs
-}
-
-private fun CoroutineScope.channelBufferToList(channel: Channel<Long>): List<Long> {
-    val outputs = mutableListOf<Long>()
-    launch { while (!channel.isEmpty) outputs.add(channel.receive()) }
-    return outputs
-}
-
-fun init(program: List<Long>, debug: Boolean = false): CoICComp {
-    // Pad memory out to more than just the program
-    val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
-    if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
-    return CoICComp(
-        memory = program.plus(memPad),
-        debug = debug
-    )
-}
-
-suspend fun runAsync(startingState: CoICComp): Deferred<CoICComp> = GlobalScope.async {
-    var state = startingState.copy(status = CompStatus.running)
-    var count = 0
-    while (state.status != CompStatus.halted) {
-        count++
-        println("Running program loop $count")
-        state = state.runNext()
-    }
-    return@async state
+/**
+ * Borrowed from https://stackoverflow.com/a/54400933/567493
+ */
+fun getRandomString(length: Int) : String {
+    val allowedChars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
+    return (1..length)
+        .map { allowedChars.random() }
+        .joinToString("")
 }
 
 enum class CompStatus {
@@ -50,13 +25,16 @@ enum class CompStatus {
     halted,
 }
 
-data class CoICComp(
+data class Computer(
     val memory: List<Long>,
     val currentPos: Int = 0,
     val status: CompStatus = CompStatus.ready,
     val currentRelBase: Int = 0,
+    val name: String = getRandomString(7),
     val inputChannel: Channel<Long> = Channel(),
     val outputChannel: Channel<Long> = Channel(OUT_BUFFER),
+    val inputs: List<Long> = listOf(),
+    val outputs: List<Long> = listOf(),
     val debug: Boolean = false
 ) {
 
@@ -68,7 +46,7 @@ data class CoICComp(
 
     fun valueAt(position: Long) = memory[position.toInt()]
 
-    suspend fun runNext(): CoICComp {
+    suspend fun runNext(): Computer {
         if (debug) println(this)
         return applyOpcode()
     }
@@ -134,88 +112,124 @@ data class CoICComp(
         else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${currentOpCode()} is unknown")
     }
 
-    fun applyAdd(): CoICComp {
+    fun applyAdd(): Computer {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
-        if (debug) println("[${currentPos}, ${currentRelBase}] adding $x to $y, result to &$outaddr")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] adding $x to $y, result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = x + y)
     }
 
-    fun applyMultiply(): CoICComp {
+    fun applyMultiply(): Computer {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
-        if (debug) println("[${currentPos}, ${currentRelBase}] multiplying $x to $y, result to &$outaddr")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] multiplying $x to $y, result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = x * y)
     }
 
-    suspend fun applyInput(): CoICComp {
+    suspend fun applyInput(): Computer {
         val outaddr = getOutPos(1)
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
         val inputVal = inputChannel.receive()
-        if (debug) println("[${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
-        return copyWithNewValueAt(position = outaddr, newValue = inputVal)
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(inputs = inputs.plus(inputVal))
     }
 
-    suspend fun applyOutput(): CoICComp {
+    suspend fun applyOutput(): Computer {
         val outval = getInParam(1)
-        if (debug) println("[${currentPos}, ${currentRelBase}] outputing $outval")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] outputing $outval")
         outputChannel.send(outval)
-        return copy(currentPos = currentPos + opcodeLength())
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] pennding output complete, continuing")
+        return copy(currentPos = currentPos + opcodeLength(), outputs = outputs.plus(outval))
     }
 
-    fun applyJumpIfTrue(): CoICComp {
+    fun applyJumpIfTrue(): Computer {
         val checkVal = getInParam(1)
-        if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-true $checkVal")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] jump-if-true $checkVal")
         return if (checkVal != 0L) applyJump() else advancePastJump()
     }
 
-    fun applyJumpIfFalse(): CoICComp {
+    fun applyJumpIfFalse(): Computer {
         val checkVal = getInParam(1)
-        if (debug) println("[${currentPos}, ${currentRelBase}] jump-if-false $checkVal")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] jump-if-false $checkVal")
         return if (checkVal == 0L) applyJump() else advancePastJump()
     }
 
-    fun advancePastJump(): CoICComp {
-        if (debug) println("[${currentPos}, ${currentRelBase}] jump-check failed")
+    fun advancePastJump(): Computer {
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] jump-check failed")
         return copy(currentPos = currentPos + opcodeLength())
     }
 
-    fun applyJump(): CoICComp {
+    fun applyJump(): Computer {
         val jumpTarget = getInParam(2).toInt()
-        if (debug) println("[${currentPos}, ${currentRelBase}] jumping to &$jumpTarget")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] jumping to &$jumpTarget")
         return copy(currentPos = jumpTarget)
     }
 
-    fun applyLessThan(): CoICComp {
+    fun applyLessThan(): Computer {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
         val result = if (x < y) 1L else 0L
-        if (debug) println("[${currentPos}, ${currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] lessthan-check result $result, storing result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = result)
     }
 
-    fun applyEqual(): CoICComp {
+    fun applyEqual(): Computer {
         val x = getInParam(1)
         val y = getInParam(2)
         val outaddr = getOutPos(3)
         val result = if (x == y) 1L else 0L
-        if (debug) println("[${currentPos}, ${currentRelBase}] equality-check result $result, storing result to &$outaddr")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] equality-check result $result, storing result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = result)
     }
 
-    fun applyChangeRelBase(): CoICComp {
+    fun applyChangeRelBase(): Computer {
         val a = getInParam(1)
-        if (debug) println("[${currentPos}, ${currentRelBase}] changing relative base by $a")
+        if (debug) println("$name: [${currentPos}, ${currentRelBase}] changing relative base by $a")
         return copy(
             currentRelBase = currentRelBase + a.toInt(),
             currentPos = currentPos + opcodeLength()
         )
     }
 
-    fun applyHalt(): CoICComp {
-        if (debug) println("halting (99)")
+    fun applyHalt(): Computer {
+        if (debug) println("$name: [$currentPos, $currentRelBase] halting (99)")
         return copy(status = CompStatus.halted)
+    }
+
+    companion object {
+        fun runComputerAsync(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false) = GlobalScope.async {
+            val comp = init(program, debug)
+            launch { inputs.forEach { comp.inputChannel.send(it) } }
+            val result = runAsync(comp).await()
+            val outputs = result.outputs
+            return@async outputs
+        }
+
+        fun init(program: String, debug: Boolean = false): Computer =
+            init(inputStringToList(program), debug)
+
+        fun init(program: List<Long>, debug: Boolean = false): Computer {
+            // Pad memory out to more than just the program
+            val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
+            if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
+            return Computer(
+                memory = program.plus(memPad),
+                debug = debug
+            )
+        }
+
+        suspend fun runAsync(startingState: Computer): Deferred<Computer> = GlobalScope.async {
+            var state = startingState.copy(status = CompStatus.running)
+            var count = 0
+            while (state.status != CompStatus.halted) {
+                count++
+                if (state.debug) println("Running program loop $count")
+                state = state.runNext()
+            }
+            return@async state
+        }
     }
 }
