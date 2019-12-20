@@ -28,14 +28,18 @@ enum class CompStatus {
 data class Computer(
     val memory: List<Long>,
     val currentPos: Int = 0,
-    val status: CompStatus = CompStatus.ready,
     val currentRelBase: Int = 0,
-    val name: String = getRandomString(7),
     val inputChannel: Channel<Long> = Channel(),
     val outputChannel: Channel<Long> = Channel(OUT_BUFFER),
-    val inputs: List<Long> = listOf(),
-    val outputs: List<Long> = listOf(),
-    val debug: Boolean = false
+    val debug: Boolean = false,
+
+    // identifier for differentiating between computers
+    val name: String = getRandomString(7),
+    // Status
+    val status: CompStatus = CompStatus.ready,
+    // Historical Record
+    val inputsRecord: List<Long> = listOf(),
+    val outputsRecord: List<Long> = listOf()
 ) {
 
     fun currentInstruction() = memory[currentPos].toInt()
@@ -133,7 +137,7 @@ data class Computer(
         if (debug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
         val inputVal = inputChannel.receive()
         if (debug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
-        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(inputs = inputs.plus(inputVal))
+        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(inputsRecord = inputsRecord.plus(inputVal))
     }
 
     suspend fun applyOutput(): Computer {
@@ -141,7 +145,7 @@ data class Computer(
         if (debug) println("$name: [${currentPos}, ${currentRelBase}] outputing $outval")
         outputChannel.send(outval)
         if (debug) println("$name: [${currentPos}, ${currentRelBase}] pennding output complete, continuing")
-        return copy(currentPos = currentPos + opcodeLength(), outputs = outputs.plus(outval))
+        return copy(currentPos = currentPos + opcodeLength(), outputsRecord = outputsRecord.plus(outval))
     }
 
     fun applyJumpIfTrue(): Computer {
@@ -200,12 +204,12 @@ data class Computer(
     }
 
     companion object {
-        fun runComputerAsync(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false) = GlobalScope.async {
+        suspend fun initAndRun(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> = coroutineScope {
             val comp = init(program, debug)
             launch { inputs.forEach { comp.inputChannel.send(it) } }
-            val result = runAsync(comp).await()
-            val outputs = result.outputs
-            return@async outputs
+            val result = run(comp)
+            val outputs = result.outputsRecord
+            return@coroutineScope outputs
         }
 
         fun init(program: String, debug: Boolean = false): Computer =
@@ -221,15 +225,14 @@ data class Computer(
             )
         }
 
-        suspend fun runAsync(startingState: Computer): Deferred<Computer> = GlobalScope.async {
+        suspend fun run(startingState: Computer): Computer = coroutineScope {
             var state = startingState.copy(status = CompStatus.running)
-            var count = 0
-            while (state.status != CompStatus.halted) {
-                count++
-                if (state.debug) println("Running program loop $count")
+            for (i in 0..Int.MAX_VALUE) {
+                if (state.debug) println("Running program loop $i")
                 state = state.runNext()
+                if (state.status == CompStatus.halted) return@coroutineScope state
             }
-            return@async state
+            return@coroutineScope state
         }
     }
 }

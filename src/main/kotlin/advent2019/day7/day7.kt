@@ -1,19 +1,24 @@
 package advent2019.day7
 
 import advent2019.coIntCode.Computer
-import advent2019.coIntCode.Computer.Companion.runAsync
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 
 fun main() {
     // part1
-    println(optimize(getProgram()))
+    println(optimize(getProgram(), ::runAmpSeries, part1Settings()))
+    // part2
+    println(optimize(getProgram(), ::runAmpLoopSeries, part2Settings()))
 }
 
-fun optimize(program: String): Pair<List<Long>, Long> {
-    val possibleSettings = listOf(0L, 1, 2, 3, 4)
+fun part1Settings() = listOf(0L, 1, 2, 3, 4)
+
+fun part2Settings() = listOf(5L, 6, 7, 8, 9)
+
+fun optimize(program: String, fn: (String, List<Long>) -> Long, possibleSettings: List<Long>): Pair<List<Long>, Long> {
     val possiblePermutations = permute(possibleSettings)
-    return possiblePermutations.map { Pair(it, runAmpSeries(program, it)) }.maxBy { it.second } ?: Pair(listOf(9L), -1L)
+    return possiblePermutations
+        .map { Pair(it, fn(program, it)) }
+        .maxBy { it.second } ?: Pair(listOf(9L), -1L)
 }
 
 fun runAmpSeries(program: String, settings: List<Long>): Long = runBlocking {
@@ -23,6 +28,7 @@ fun runAmpSeries(program: String, settings: List<Long>): Long = runBlocking {
     val amp3 = Computer.init(program).copy(inputChannel = amp2.outputChannel)
     val amp4 = Computer.init(program).copy(inputChannel = amp3.outputChannel)
     val amp5 = Computer.init(program).copy(inputChannel = amp4.outputChannel)
+
     // Setup the initial inputs
     launch {
         amp1.inputChannel.send(settings[0])
@@ -32,11 +38,44 @@ fun runAmpSeries(program: String, settings: List<Long>): Long = runBlocking {
     launch { amp3.inputChannel.send(settings[2]) }
     launch { amp4.inputChannel.send(settings[3]) }
     launch { amp5.inputChannel.send(settings[4]) }
+
     // Start the computers
-    listOf(amp1, amp2, amp3, amp4).map { runAsync(it) }
-    val amp5FinalState = runAsync(amp5).await()
-    val amp5Output = amp5FinalState.outputs
+    listOf(amp1, amp2, amp3, amp4).map { async { Computer.run(it) } }
+    val amp5FinalState = Computer.run(amp5)
+    val amp5Output = amp5FinalState.outputsRecord
     return@runBlocking amp5Output.first()
+}
+
+fun runAmpLoopSeries(program: String, settings: List<Long>): Long = runBlocking {
+    // initializing and wiring
+    val amp1 = Computer.init(program)
+    val amp2 = Computer.init(program).copy(inputChannel = amp1.outputChannel)
+    val amp3 = Computer.init(program).copy(inputChannel = amp2.outputChannel)
+    val amp4 = Computer.init(program).copy(inputChannel = amp3.outputChannel)
+    val amp5 = Computer.init(program)
+        .copy(inputChannel = amp4.outputChannel, outputChannel = amp1.inputChannel)
+
+    // Setup the initial inputs
+    val initialized = listOf(amp1, amp2, amp3, amp4, amp5).mapIndexed { i, x ->
+        async { x.inputChannel.send(settings[i]) }
+    }
+    val amp1Inited = async {
+        initialized.first().await()
+        amp1.inputChannel.send(0)
+    }
+
+    // Start the computers - make sure to get all amp1 initial inputs in before starting amp5
+    val amp1to4 = listOf(amp1, amp2, amp3, amp4).map { async { Computer.run(it) } }
+    amp1Inited.await()
+    launch { Computer.run(amp5) }
+
+    // Wait for amp1-4 to finish since amp5 will block trying to send its last output
+    amp1to4.awaitAll()
+
+    // Get the last output out of amp5
+    val amp5Result = async { amp5.outputChannel.receive() }
+    val amp5Output = amp5Result.await()
+    return@runBlocking amp5Output
 }
 
 /**
