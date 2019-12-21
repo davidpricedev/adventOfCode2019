@@ -16,6 +16,10 @@ fun main() {
     // part1
     val finalState1 = runRobot()
     println(finalState1.hull.count())
+    visualizeHull(finalState1.hull)
+    // part2
+    val finalState2 = runRobot(mapOf(Position() to Colour.White))
+    visualizeHull(finalState2.hull)
 }
 
 /**
@@ -41,6 +45,19 @@ fun runRobot(hull: Map<Position, Colour> = mapOf()) = runBlocking {
         state = state.next()
     }
     return@runBlocking state
+}
+
+fun visualizeHull(hull: Map<Position, Colour>) {
+    val rightBound = hull.keys.maxBy { it.x }?.x ?: 0
+    val leftBound = hull.keys.minBy { it.x }?.x ?: 0
+    val upperBound = hull.keys.maxBy { it.y }?.y ?: 0
+    val lowerBound = hull.keys.minBy { it.y }?.y ?: 0
+    fun printRow(row: Int) {
+        println((leftBound..rightBound)
+                    .map { col -> hull.getColourAt(Position(col, row)).viz() }
+                    .joinToString(""))
+    }
+    (lowerBound..upperBound).forEach { row -> printRow(row) }
 }
 
 data class State(
@@ -118,6 +135,12 @@ enum class Direction {
 enum class Colour(val value: Long) {
     Black(0),
     White(1);
+
+    fun viz() =
+        when (this) {
+            Black -> " . "
+            White -> "<#>"
+        }
 
     companion object {
         fun fromLong(intColour: Long) =
