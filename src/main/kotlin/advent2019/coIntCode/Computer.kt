@@ -4,7 +4,7 @@ import advent2019.util.toCharStringList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 
-val MEM_SIZE = 2048
+val MEM_SIZE = 8192
 val OUT_BUFFER = 200
 
 fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() }
