@@ -12,7 +12,7 @@ fun inputStringToList(inputStr: String) = inputStr.split(",").map { it.toLong() 
 /**
  * Borrowed from https://stackoverflow.com/a/54400933/567493
  */
-fun getRandomString(length: Int) : String {
+fun getRandomString(length: Int): String {
     val allowedChars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz"
     return (1..length)
         .map { allowedChars.random() }
@@ -31,7 +31,11 @@ data class Computer(
     val currentRelBase: Int = 0,
     val inputChannel: Channel<Long> = Channel(),
     val outputChannel: Channel<Long> = Channel(OUT_BUFFER),
+
+    // Behaviour flags
+    val ioDebug: Boolean = false,
     val debug: Boolean = false,
+    val closeChannels: Boolean = false,
 
     // identifier for differentiating between computers
     val name: String = getRandomString(7),
@@ -134,17 +138,21 @@ data class Computer(
 
     suspend fun applyInput(): Computer {
         val outaddr = getOutPos(1)
-        if (debug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
+        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
         val inputVal = inputChannel.receive()
-        if (debug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
-        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(inputsRecord = inputsRecord.plus(inputVal))
+        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
+        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(
+            inputsRecord = inputsRecord.plus(
+                inputVal
+            )
+        )
     }
 
     suspend fun applyOutput(): Computer {
         val outval = getInParam(1)
-        if (debug) println("$name: [${currentPos}, ${currentRelBase}] outputing $outval")
+        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] outputing $outval")
         outputChannel.send(outval)
-        if (debug) println("$name: [${currentPos}, ${currentRelBase}] pennding output complete, continuing")
+        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] pennding output complete, continuing")
         return copy(currentPos = currentPos + opcodeLength(), outputsRecord = outputsRecord.plus(outval))
     }
 
@@ -199,28 +207,35 @@ data class Computer(
     }
 
     fun applyHalt(): Computer {
-        if (debug) println("$name: [$currentPos, $currentRelBase] halting (99)")
+        if (debug or ioDebug) println("$name: [$currentPos, $currentRelBase] halting (99)")
         return copy(status = CompStatus.halted)
     }
 
     companion object {
-        suspend fun initAndRun(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): List<Long> = coroutineScope {
-            val comp = init(program, debug)
-            launch { inputs.forEach { comp.inputChannel.send(it) } }
-            val result = run(comp)
-            val outputs = result.outputsRecord
-            return@coroutineScope outputs
-        }
+        suspend fun initAndRun(
+            program: List<Long>,
+            inputs: List<Long> = listOf(),
+            ioDebug: Boolean = false,
+            debug: Boolean = false
+        ): List<Long> =
+            coroutineScope {
+                val comp = init(program, ioDebug, debug)
+                launch { inputs.forEach { comp.inputChannel.send(it) } }
+                val result = run(comp)
+                val outputs = result.outputsRecord
+                return@coroutineScope outputs
+            }
 
-        fun init(program: String, debug: Boolean = false): Computer =
-            init(inputStringToList(program), debug)
+        fun init(program: String, ioDebug: Boolean = false, debug: Boolean = false): Computer =
+            init(inputStringToList(program), ioDebug, debug)
 
-        fun init(program: List<Long>, debug: Boolean = false): Computer {
+        fun init(program: List<Long>, ioDebug: Boolean = false, debug: Boolean = false): Computer {
             // Pad memory out to more than just the program
             val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
             if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
             return Computer(
                 memory = program.plus(memPad),
+                ioDebug = ioDebug,
                 debug = debug
             )
         }
@@ -229,6 +244,7 @@ data class Computer(
             var state = startingState.copy(status = CompStatus.running)
             for (i in 0..Int.MAX_VALUE) {
                 if (state.debug) println("Running program loop $i")
+                if (i % 100000 == 0 && i > 0) println("Running program loop $i")
                 state = state.runNext()
                 if (state.status == CompStatus.halted) return@coroutineScope state
             }
