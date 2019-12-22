@@ -23,6 +23,8 @@ enum class CompStatus {
     ready,
     running,
     halted,
+
+    waitingForInput,
 }
 
 data class Computer(
@@ -41,6 +43,7 @@ data class Computer(
     val name: String = getRandomString(7),
     // Status
     val status: CompStatus = CompStatus.ready,
+    val statusChannel: Channel<CompStatus> = Channel(),
     // Historical Record
     val inputsRecord: List<Long> = listOf(),
     val outputsRecord: List<Long> = listOf()
@@ -139,6 +142,7 @@ data class Computer(
     suspend fun applyInput(): Computer {
         val outaddr = getOutPos(1)
         if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
+        statusChannel.send(CompStatus.waitingForInput)
         val inputVal = inputChannel.receive()
         if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(
@@ -206,8 +210,9 @@ data class Computer(
         )
     }
 
-    fun applyHalt(): Computer {
+    suspend fun applyHalt(): Computer {
         if (debug or ioDebug) println("$name: [$currentPos, $currentRelBase] halting (99)")
+        statusChannel.send(CompStatus.halted)
         return copy(status = CompStatus.halted)
     }
 
