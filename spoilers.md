@@ -30,22 +30,22 @@ That means that playing an ascii game from the console is really annoying -
  you must type a movement command and then hit enter.
 In fact it is so annoying that I gave up trying to play it interactively.
 I have a few ideas about how to write an AI that would play it for me though.
-* 1st track the ball's trajectory
-* start by keeping under the ball at all times
+* 1st track the ball's diagonal trajectory
+* start by keeping under the ball at all times, trajectory tells us which direction to move to achieve that.
 * add more flexibility as needed - esp for cases where the ball isn't within 6-10 spaces of the paddle.
+  Or for handling literal edge cases such as bouncing off the left or right edge
 
 ## day 14 : Ore to Fuel Crafting
 
 There is probably a LCM/GCF way of solving part 2, but we can use part1 solver to do it too.
-Part1 determines ore needs for n fuel. So we can start with 1T/ore-needs-for-1-fuel as a good 
- starting guess and increase fuel guesses until we find the maximum that doesn't exceed 1T ore.
+Part1 determines ore needs for n fuel. So we can start with 1T divided by ore-needs-for-1-fuel
+ as a good starting guess and increase fuel guesses until we find the maximum that doesn't exceed 1T ore.
 
 ## day 16 : Signal Processing
 
 While part1 was pretty easy, part2 involves some sort of trick.
 My initial extension of part1 blew the heap.
-After tweaking things a bit, I was able to avoid that, at the cost of time (probably roughly 100 hours)
+After tweaking things a bit, I was able to avoid that, at the cost of time (probably roughly 100 hours) -
+ and that is just for one of the examples
 Clearly there are one or more maths tricks that can greatly short circuit the amount of processing.
-I'm here to learn Kotlin not maths tricks.
-
 

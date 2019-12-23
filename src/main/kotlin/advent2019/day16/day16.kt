@@ -1,6 +1,7 @@
 package advent2019.day16
 
 import advent2019.util.memoize
+import advent2019.util.repeat
 import advent2019.util.toPerCharIntList
 import kotlin.math.abs
 
@@ -26,7 +27,6 @@ val patternN = ::rawPatternN.memoize()
 fun rawPatternN(n: Int, length: Int): List<Int> {
     val base = basePatternN(n)
     return base.repeat(1 + (length / base.count())).subList(1, length + 1)
-}
 }
 
 fun first8Digits(input: List<Int>) = input.subList(0, 8).joinToString("")
