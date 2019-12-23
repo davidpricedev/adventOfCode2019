@@ -1,6 +1,6 @@
 package advent2019.coIntCode
 
-import advent2019.util.toCharStringList
+import advent2019.util.toPerCharIntList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 
@@ -92,8 +92,7 @@ data class Computer(
         ("000" + currentInstruction() / 100)
             .reversed()
             .substring(0, 3)
-            .toCharStringList()
-            .map { it.toInt() }
+            .toPerCharIntList()
 
     suspend fun applyOpcode() = when (currentOpCode()) {
         1    -> applyAdd()

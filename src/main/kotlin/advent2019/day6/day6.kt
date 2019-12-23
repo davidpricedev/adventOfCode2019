@@ -1,5 +1,6 @@
 package advent2019.day6
 
+import advent2019.util.memoize
 
 fun main() {
     runPart1()
@@ -48,17 +49,6 @@ fun inputToMap(input: List<String>) = input.map { stringToPair(it) }.toMap()
 fun stringToPair(orbitStr: String): Pair<String, String> {
     val parts = orbitStr.split(")")
     return Pair(parts[1], parts[0])
-}
-
-// Memoize borrowed from https://github.com/aballano/mnemonik
-fun <A, B, C, R> ((A, B, C) -> R).memoize(
-    initialCapacity: Int = 256
-): (A, B, C) -> R = memoize(HashMap(initialCapacity))
-
-fun <A, B, C, R> ((A, B, C) -> R).memoize(
-    cache: MutableMap<Triple<A, B, C>, R>
-): (A, B, C) -> R = { a: A, b: B, c: C ->
-    cache.getOrPut(Triple(a, b, c)) { this(a, b, c) }
 }
 
 fun getInput() = """

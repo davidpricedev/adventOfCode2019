@@ -1,6 +1,6 @@
 package advent2019.IntCode
 
-import advent2019.util.toCharStringList
+import advent2019.util.toPerCharIntList
 import kotlin.math.floor
 
 val MEM_SIZE = 2048
@@ -108,8 +108,7 @@ data class ICComp(
         ("000" + currentInstruction() / 100)
             .reversed()
             .substring(0, 3)
-            .toCharStringList()
-            .map { it.toInt() }
+            .toPerCharIntList()
 
     fun applyAdd(): ICComp {
         val x = getInParam(1)
