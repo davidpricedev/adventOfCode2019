@@ -1,3 +1,8 @@
+/**
+ * This is a variant of the int-code computer that is co-routine based
+ * It is used for more interactive use cases - starting on day7
+ */
+
 package advent2019.coIntCode
 
 import advent2019.util.toPerCharIntList

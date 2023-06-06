@@ -3,16 +3,17 @@ package advent2019.day6
 import advent2019.util.memoize
 
 fun main() {
-    runPart1()
-    runPart2()
+    val inputAsMap = inputToMap(getInput())
+    runPart1(inputAsMap)
+    runPart2(inputAsMap)
 }
 
-fun runPart1() {
-    println(countAllAncestors(inputToMap(getInput())))
+fun runPart1(inputAsMap: Map<String, String>) {
+    println(countAllAncestors(inputAsMap))
 }
 
-fun runPart2() {
-    println(calculateShortestPath(getInput(), "YOU", "SAN"))
+fun runPart2(inputAsMap: Map<String, String>) {
+    println(calculateShortestPath(inputAsMap, "YOU", "SAN"))
 }
 
 fun countAllAncestors(map: Map<String, String>) =
@@ -22,9 +23,8 @@ fun countAllAncestors(map: Map<String, String>) =
  * Part 2
  * Calculate the shortest orbit jump path between one orbiting body (start) and another (dest)
  */
-fun calculateShortestPath(input: List<String>, start: String, dest: String): Int {
+fun calculateShortestPath(map: Map<String, String>, start: String, dest: String): Int {
     // Build the raw data we need
-    val map = inputToMap(input)
     val ancestorMap = map.mapValues { buildAncestorList(it.key, map, listOf()) }
     // Now find the nearest common ancestor
     val startAncestors = ancestorMap[start] ?: listOf()

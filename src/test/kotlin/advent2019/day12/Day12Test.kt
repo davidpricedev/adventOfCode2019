@@ -58,4 +58,24 @@ class Day12Test : FreeSpec(
                 totalEnergy(moonsTime100) shouldBe 1940
             }
         }
+        "Part2" - {
+            "calculate periodicy - example 1" {
+                val moonStart = listOf(
+                        Moon(Point(-1, 0, 2)),
+                        Moon(Point(2, -10, -7)),
+                        Moon(Point(4, -8, 8)),
+                        Moon(Point(3, 5, -1))
+                )
+                calculatePeriodicity(moonStart) shouldBe 2772L
+            }
+            "calculate periodicy - example 2" {
+                val moonStart = listOf(
+                        Moon(Point(-8, -10, 0)),
+                        Moon(Point(5, 5, 10)),
+                        Moon(Point(2, -7, 3)),
+                        Moon(Point(9, -8, -3))
+                )
+                calculatePeriodicity(moonStart) shouldBe 4686774924L
+            }
+        }
     })

@@ -1,3 +1,7 @@
+/**
+ * Represents the int-code computer used in many of the puzzles
+ */
+
 package advent2019.IntCode
 
 import advent2019.util.toPerCharIntList

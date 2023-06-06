@@ -27,7 +27,7 @@ fun findInputsForGivenOutput(): Long {
 fun run(noun: Long, verb: Long) = ICComp(get_real_program(noun, verb)).run().memory[0]
 
 /**
- * Deal with the replacement insanity
+ * Deal with the replacement
  */
 fun get_real_program(noun: Long, verb: Long) =
     inputStringToList(get_bogus_program()).mapIndexed { i, x ->

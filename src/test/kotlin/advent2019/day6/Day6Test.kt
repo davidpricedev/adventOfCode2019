@@ -40,7 +40,7 @@ class Day6Test : FreeSpec(
                     K)L
                     K)YOU
                     I)SAN""".trimIndent().trim().split("\n")
-                calculateShortestPath(input, "YOU", "SAN") shouldBe 4
+                calculateShortestPath(inputToMap(input), "YOU", "SAN") shouldBe 4
             }
         }
     })
