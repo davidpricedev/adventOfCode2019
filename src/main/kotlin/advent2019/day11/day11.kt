@@ -1,6 +1,8 @@
 package advent2019.day11
 
 import advent2019.coIntCode.Computer
+import advent2019.coIntCode.IOMessage
+import advent2019.coIntCode.IntCodeCompHalted
 import kotlinx.coroutines.*
 import java.lang.Exception
 
@@ -74,15 +76,21 @@ data class State(
     suspend fun next(): State {
         // Read the color at current position into the computer
         val sendResult = withTimeoutOrNull(500L) {
-            comp.inputChannel.send(hull.getColourAt(robot.pos()).value)
+            comp.inputChannel.send(IOMessage.Value(hull.getColourAt(robot.pos()).value))
         } ?: return copy(done = true)
 
         // receive colour and paint
-        val nextColour = Colour.fromLong(comp.outputChannel.receive())
+        val nextColour = when (val rawColor = comp.outputChannel.receive()) {
+            is IOMessage.Value -> Colour.fromLong(rawColor.value)
+            is IOMessage.Halted -> throw IntCodeCompHalted()
+        }
         val nextHull = hull.plus(robot.pos() to nextColour)
 
         // receive turn and move
-        val nextDirection = robot.direction.nextDirection(comp.outputChannel.receive())
+        val nextDirection = when (val rawDirection = comp.outputChannel.receive()) {
+            is IOMessage.Value -> robot.direction.nextDirection(rawDirection.value)
+            is IOMessage.Halted -> throw IntCodeCompHalted()
+        }
         val nextRobot = robot.nextPosition(nextDirection)
 
         // Next

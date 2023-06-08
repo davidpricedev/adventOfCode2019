@@ -1,6 +1,8 @@
 package advent2019.day7
 
 import advent2019.coIntCode.Computer
+import advent2019.coIntCode.IOMessage
+import advent2019.coIntCode.IntCodeCompHalted
 import kotlinx.coroutines.*
 
 fun main() {
@@ -31,13 +33,13 @@ fun runAmpSeries(program: String, settings: List<Long>): Long = runBlocking {
 
     // Setup the initial inputs
     launch {
-        amp1.inputChannel.send(settings[0])
-        amp1.inputChannel.send(0)
+        amp1.inputChannel.send(IOMessage.Value(settings[0]))
+        amp1.inputChannel.send(IOMessage.Value(0))
     }
-    launch { amp2.inputChannel.send(settings[1]) }
-    launch { amp3.inputChannel.send(settings[2]) }
-    launch { amp4.inputChannel.send(settings[3]) }
-    launch { amp5.inputChannel.send(settings[4]) }
+    launch { amp2.inputChannel.send(IOMessage.Value(settings[1])) }
+    launch { amp3.inputChannel.send(IOMessage.Value(settings[2])) }
+    launch { amp4.inputChannel.send(IOMessage.Value(settings[3])) }
+    launch { amp5.inputChannel.send(IOMessage.Value(settings[4])) }
 
     // Start the computers
     listOf(amp1, amp2, amp3, amp4).map { async { Computer.run(it) } }
@@ -53,15 +55,15 @@ fun runAmpLoopSeries(program: String, settings: List<Long>): Long = runBlocking 
     val amp3 = Computer.init(program).copy(inputChannel = amp2.outputChannel)
     val amp4 = Computer.init(program).copy(inputChannel = amp3.outputChannel)
     val amp5 = Computer.init(program)
-        .copy(inputChannel = amp4.outputChannel, outputChannel = amp1.inputChannel)
+            .copy(inputChannel = amp4.outputChannel, outputChannel = amp1.inputChannel)
 
     // Setup the initial inputs
     val initialized = listOf(amp1, amp2, amp3, amp4, amp5).mapIndexed { i, x ->
-        async { x.inputChannel.send(settings[i]) }
+        async { x.inputChannel.send(IOMessage.Value(settings[i])) }
     }
     val amp1Inited = async {
         initialized.first().await()
-        amp1.inputChannel.send(0)
+        amp1.inputChannel.send(IOMessage.Value(0))
     }
 
     // Start the computers - make sure to get all amp1 initial inputs in before starting amp5
@@ -74,8 +76,10 @@ fun runAmpLoopSeries(program: String, settings: List<Long>): Long = runBlocking 
 
     // Get the last output out of amp5
     val amp5Result = async { amp5.outputChannel.receive() }
-    val amp5Output = amp5Result.await()
-    return@runBlocking amp5Output
+    return@runBlocking when (val rawResult = amp5Result.await()) {
+        is IOMessage.Value -> rawResult.value
+        is IOMessage.Halted -> throw IntCodeCompHalted()
+    }
 }
 
 /**

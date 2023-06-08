@@ -32,12 +32,19 @@ enum class CompStatus {
     waitingForInput,
 }
 
+class IntCodeCompHalted : Exception("Halted")
+
+sealed class IOMessage {
+    class Value(val value: Long): IOMessage()
+    object Halted: IOMessage()
+}
+
 data class Computer(
     val memory: List<Long>,
     val currentPos: Int = 0,
     val currentRelBase: Int = 0,
-    val inputChannel: Channel<Long> = Channel(),
-    val outputChannel: Channel<Long> = Channel(OUT_BUFFER),
+    val inputChannel: Channel<IOMessage> = Channel(),
+    val outputChannel: Channel<IOMessage> = Channel(OUT_BUFFER),
 
     // Behaviour flags
     val ioDebug: Boolean = false,
@@ -147,20 +154,24 @@ data class Computer(
         val outaddr = getOutPos(1)
         if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] waiting for input")
         statusChannel.send(CompStatus.waitingForInput)
-        val inputVal = inputChannel.receive()
-        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
-        return copyWithNewValueAt(position = outaddr, newValue = inputVal).copy(
-            inputsRecord = inputsRecord.plus(
-                inputVal
-            )
-        )
+        when (val inputVal = inputChannel.receive()) {
+            is IOMessage.Value -> {
+                if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] inputing ${inputVal.value} result to &$outaddr")
+                return copyWithNewValueAt(position = outaddr, newValue = inputVal.value).copy(
+                        inputsRecord = inputsRecord.plus(
+                                inputVal.value
+                        )
+                )
+            }
+            is IOMessage.Halted -> throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input from halted channel")
+        }
     }
 
     suspend fun applyOutput(): Computer {
         val outval = getInParam(1)
         if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] outputing $outval")
-        outputChannel.send(outval)
-        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] pennding output complete, continuing")
+        outputChannel.send(IOMessage.Value(outval))
+        if (debug or ioDebug) println("$name: [${currentPos}, ${currentRelBase}] pending output complete, continuing")
         return copy(currentPos = currentPos + opcodeLength(), outputsRecord = outputsRecord.plus(outval))
     }
 
@@ -217,6 +228,7 @@ data class Computer(
     suspend fun applyHalt(): Computer {
         if (debug or ioDebug) println("$name: [$currentPos, $currentRelBase] halting (99)")
         statusChannel.send(CompStatus.halted)
+        outputChannel.send(IOMessage.Halted)
         return copy(status = CompStatus.halted)
     }
 
@@ -229,7 +241,7 @@ data class Computer(
         ): List<Long> =
             coroutineScope {
                 val comp = init(program, ioDebug, debug)
-                launch { inputs.forEach { comp.inputChannel.send(it) } }
+                launch { inputs.forEach { comp.inputChannel.send(IOMessage.Value(it)) } }
                 val result = run(comp)
                 val outputs = result.outputsRecord
                 return@coroutineScope outputs
