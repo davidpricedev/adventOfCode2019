@@ -32,6 +32,7 @@ fun runGamePart1() = runBlocking {
  * Score doesn't seem to proceed predictably, 50 for first block, 96 for second, etc
  * So we can't cheese it by simply multiplying 50 * number-of-blocks
  * Playing manually is tedious, but doable
+ * AI should be as easy move towards the ball. It always moves perfectly diagonally, so we can always move fast enough
  */
 fun runGamePart2() = runBlocking {
     val comp = Computer.init(getProgramPart2())
@@ -42,10 +43,8 @@ fun runGamePart2() = runBlocking {
         joyLoop@ while (true) {
             when (val nextStatus = comp.statusChannel.receive()) {
                 CompStatus.waitingForInput -> {
-                    println("Pending input: ")
-                    delay(500)
-                    val joystickInput = keyToDirectionId(readLine() ?: "")
-                    comp.inputChannel.send(joystickInput)
+                    delay(1)
+                    comp.inputChannel.send(getNextAIMove(state))
                 }
 
                 CompStatus.halted -> break@joyLoop
@@ -56,7 +55,7 @@ fun runGamePart2() = runBlocking {
     val screenJob = launch {
         while (!state.done) {
             state = state.next()
-            visualizeScreen(state.score, state.tileData)
+            // visualizeScreen(state.score, state.tileData)
         }
         throw CancellationException("Computer Halted")
     }
@@ -68,9 +67,20 @@ fun runGamePart2() = runBlocking {
     return@runBlocking state
 }
 
-fun keyToDirectionId(key: String): Long = when (key) {
-    "a" -> -1
-    "d" -> 1
+/** subset of standard wasd */
+fun getNextManualMove(): Long {
+    println("Pending input: ")
+    return when (readLine() ?: "") {
+        "a" -> -1
+        "d" -> 1
+        else -> 0
+    }
+}
+
+/** "AI" player */
+fun getNextAIMove(state: State): Long = when {
+    state.paddleX > state.ballX -> -1
+    state.paddleX < state.ballX -> 1
     else -> 0
 }
 
@@ -95,22 +105,35 @@ data class State(
         val tileData: Map<Position, TileContent> = mapOf(),
         val done: Boolean = false,
         val score: Long = 0,
-        val loops: Int = 0
+        val loops: Int = 0,
+        val ballX: Int = 0,
+        val paddleX: Int = 0
 ) {
     suspend fun next(): State {
-        return withTimeoutOrNull(30000L) {
+        return withTimeoutOrNull(2000L) {
             val x = comp.outputChannel.receive().toInt()
             val y = comp.outputChannel.receive().toInt()
             val z = comp.outputChannel.receive()
 
             // Next
             return@withTimeoutOrNull if (x == -1 && y == 0) {
-                println("New Score: $z (+${z - score})")
+                // println("New Score: $z (+${z - score})")
                 copy(score = z)
             } else {
-                val newEntry = Position(x, y) to TileContent.fromId(z)
-                println("New Entry $newEntry")
-                copy(tileData = tileData.plus(newEntry))
+                val tileType = TileContent.fromId(z)
+                val newEntry = Position(x, y) to tileType
+                // println("New Entry $newEntry")
+                when (tileType) {
+                    TileContent.Ball -> {
+                        copy(tileData = tileData.plus(newEntry), ballX = x)
+                    }
+                    TileContent.Paddle -> {
+                        copy(tileData = tileData.plus(newEntry), paddleX = x)
+                    }
+                    else -> {
+                        copy(tileData = tileData.plus(newEntry))
+                    }
+                }
             }
         } ?: return copy(done = true)
     }
