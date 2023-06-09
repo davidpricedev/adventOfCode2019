@@ -91,9 +91,7 @@ fun visualizeScreen(score: Long, tileData: Map<Position, TileContent>) {
     val lowerBound = tileData.keys.minBy { it.y }?.y ?: 0
     println("##  Score: $score  ##".padStart(55, ' '))
     fun printRow(row: Int) {
-        println((leftBound..rightBound)
-                .map { col -> tileData.getContentAt(Position(col, row)).viz() }
-                .joinToString(""))
+        println((leftBound..rightBound).joinToString("") { col -> tileData.getContentAt(Position(col, row)).viz() })
     }
     (lowerBound..upperBound).forEach { row -> printRow(row) }
 }
@@ -127,9 +125,11 @@ data class State(
                     TileContent.Ball -> {
                         copy(tileData = tileData.plus(newEntry), ballX = x)
                     }
+
                     TileContent.Paddle -> {
                         copy(tileData = tileData.plus(newEntry), paddleX = x)
                     }
+
                     else -> {
                         copy(tileData = tileData.plus(newEntry))
                     }

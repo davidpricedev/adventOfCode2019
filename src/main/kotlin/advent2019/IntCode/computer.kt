@@ -5,7 +5,6 @@
 package advent2019.IntCode
 
 import advent2019.util.toPerCharIntList
-import kotlin.math.floor
 
 val MEM_SIZE = 2048
 
@@ -26,15 +25,31 @@ fun runComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boole
     return result.outputs
 }
 
+fun startComputer(program: List<Long>, inputs: List<Long> = listOf(), debug: Boolean = false): ICComp {
+    // Pad memory out to more than just the program
+    val memPad = (0 until MEM_SIZE - program.count()).map { 0L }
+    if (program.count() > MEM_SIZE) throw Exception("program too big for current computer memory")
+
+    val comp = ICComp(memory = program.plus(memPad), inputs = inputs, debug = debug)
+    return comp.runUntilPrompt()
+}
+
+enum class ComputerStatus {
+    Ready,
+    Running,
+    Halted,
+    WaitingForInput,
+}
+
 data class ICComp(
-    val memory: List<Long>,
-    val currentPos: Int = 0,
-    val status: String = "running",
-    val currentRelBase: Int = 0,
-    val inputs: List<Long> = listOf(),
-    val inputPtr: Int = 0,
-    val outputs: List<Long> = listOf(),
-    val debug: Boolean = false
+        val memory: List<Long>,
+        val currentPos: Int = 0,
+        val status: ComputerStatus = ComputerStatus.Running,
+        val currentRelBase: Int = 0,
+        val inputs: List<Long> = listOf(),
+        val inputPtr: Int = 0,
+        val outputs: List<Long> = listOf(),
+        val debug: Boolean = false
 ) {
     fun currentInstruction() = memory[currentPos].toInt()
 
@@ -45,18 +60,30 @@ data class ICComp(
     fun valueAt(position: Long) = memory[position.toInt()]
 
     fun run(): ICComp =
-        generateSequence(this) {
-            it.runNext().takeIf { x -> x.status != "halted" }
-        }.toList().last()
+            generateSequence(this) {
+                it.runNext().takeIf { x -> x.status != ComputerStatus.Halted }
+            }.toList().last()
 
     fun runNext(): ICComp {
         if (debug) println(this)
         return applyOpcode()
     }
 
+    fun runUntilPrompt(): ICComp =
+            generateSequence(this) {
+                it.runNext().takeIf { x -> x.status == ComputerStatus.Running }
+            }.toList().last()
+
+    // send inputs in, run until it stops for any reason, and return the (new) outputs
+    fun runInput(inputs: List<Long>): Pair<ICComp, List<Long>> {
+        val finalState = copy(inputs = this.inputs + inputs).runUntilPrompt()
+        val outputs = finalState.outputs.takeLast(finalState.outputs.count() - this.outputs.count())
+        return Pair(finalState, outputs)
+    }
+
     fun copyWithNewValueAt(position: Int, newValue: Long) = this.copy(
-        memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
-        currentPos = currentPos + opcodeLength(currentOpCode())
+            memory = memory.mapIndexed { index, x -> if (index == position) newValue else x },
+            currentPos = currentPos + opcodeLength(currentOpCode())
     )
 
     fun memoryAsString() = memory.joinToString(",") { it.toString() }
@@ -64,9 +91,9 @@ data class ICComp(
     fun getInParam(paramOrd: Int): Long {
         val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
-            0    -> valueAt(valueAt(currentPos + paramOrd))
-            1    -> valueAt(currentPos + paramOrd)
-            2    -> valueAt(currentRelBase + valueAt(currentPos + paramOrd))
+            0 -> valueAt(valueAt(currentPos + paramOrd))
+            1 -> valueAt(currentPos + paramOrd)
+            2 -> valueAt(currentRelBase + valueAt(currentPos + paramOrd))
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode is unknown")
         }
     }
@@ -74,45 +101,45 @@ data class ICComp(
     fun getOutPos(paramOrd: Int): Int {
         val mode = getParamModes()[paramOrd - 1]
         return when (mode) {
-            0    -> valueAt(currentPos + paramOrd).toInt()
-            2    -> (currentRelBase + valueAt(currentPos + paramOrd)).toInt()
+            0 -> valueAt(currentPos + paramOrd).toInt()
+            2 -> (currentRelBase + valueAt(currentPos + paramOrd)).toInt()
             else -> throw Exception("(╯°□°)╯︵ ┻━┻ parameter mode $mode for result param is unexpected")
         }
     }
 
     fun applyOpcode() = when (currentOpCode()) {
-        1    -> applyAdd()
-        2    -> applyMultiply()
-        3    -> applyInput()
-        4    -> applyOutput()
-        5    -> applyJumpIfTrue()
-        6    -> applyJumpIfFalse()
-        7    -> applyLessThan()
-        8    -> applyEqual()
-        9    -> applyChangeRelBase()
-        99   -> applyHalt()
+        1 -> applyAdd()
+        2 -> applyMultiply()
+        3 -> applyInput()
+        4 -> applyOutput()
+        5 -> applyJumpIfTrue()
+        6 -> applyJumpIfFalse()
+        7 -> applyLessThan()
+        8 -> applyEqual()
+        9 -> applyChangeRelBase()
+        99 -> applyHalt()
         else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode ${currentOpCode()} is unknown")
     }
 
     fun opcodeLength(opcode: Int): Int = when (opcode) {
-        1    -> 4
-        2    -> 4
-        3    -> 2
-        4    -> 2
-        5    -> 3
-        6    -> 3
-        7    -> 4
-        8    -> 4
-        9    -> 2
-        99   -> 1
+        1 -> 4
+        2 -> 4
+        3 -> 2
+        4 -> 2
+        5 -> 3
+        6 -> 3
+        7 -> 4
+        8 -> 4
+        9 -> 2
+        99 -> 1
         else -> throw Exception("(╯°□°)╯︵ ┻━┻ opcode $opcode is unknown")
     }
 
     fun getParamModes() =
-        ("000" + currentInstruction() / 100)
-            .reversed()
-            .substring(0, 3)
-            .toPerCharIntList()
+            ("000" + currentInstruction() / 100)
+                    .reversed()
+                    .substring(0, 3)
+                    .toPerCharIntList()
 
     fun applyAdd(): ICComp {
         val x = getInParam(1)
@@ -131,21 +158,22 @@ data class ICComp(
     }
 
     fun applyInput(): ICComp {
-        if (inputs.count() == 0 || inputPtr >= inputs.count())
-            throw Exception("(╯°□°)╯︵ ┻━┻ trying to read input that doesn't exist")
+        if (inputs.isEmpty() || inputPtr >= inputs.count()) {
+            return copy(status = ComputerStatus.WaitingForInput)
+        }
         val outaddr = getOutPos(1)
         val inputVal = inputs[inputPtr]
         if (debug) println("[${currentPos}, ${currentRelBase}] inputing $inputVal result to &$outaddr")
         return copyWithNewValueAt(position = outaddr, newValue = inputVal)
-            .copy(inputPtr = inputPtr + 1)
+                .copy(inputPtr = inputPtr + 1)
     }
 
     fun applyOutput(): ICComp {
         val outval = getInParam(1)
         if (debug) println("[${currentPos}, ${currentRelBase}] outputing $outval")
         return copy(
-            outputs = outputs.plus(outval),
-            currentPos = currentPos + opcodeLength(currentOpCode())
+                outputs = outputs.plus(outval),
+                currentPos = currentPos + opcodeLength(currentOpCode())
         )
     }
 
@@ -194,13 +222,13 @@ data class ICComp(
         val a = getInParam(1)
         if (debug) println("[${currentPos}, ${currentRelBase}] changing relative base by $a")
         return copy(
-            currentRelBase = currentRelBase + a.toInt(),
-            currentPos = currentPos + opcodeLength(currentOpCode())
+                currentRelBase = currentRelBase + a.toInt(),
+                currentPos = currentPos + opcodeLength(currentOpCode())
         )
     }
 
     fun applyHalt(): ICComp {
         if (debug) println("halting (99)")
-        return copy(status = "halted")
+        return copy(status = ComputerStatus.Halted)
     }
 }
